@@ -9,31 +9,37 @@ import Tokenizers
 
 @Observable
 @MainActor
-final class InferenceEngine {
-    enum LoadState: Equatable {
+public final class InferenceEngine {
+    public enum LoadState: Equatable {
         case idle
         case loading
         case ready
         case failed(String)
     }
 
-    var state: LoadState = .idle
-    var tokenCount: Int = 0
-    var contextWindow: Int = 0
+    public var state: LoadState = .idle
+    public var tokenCount: Int = 0
+    public var contextWindow: Int = 0
     private var container: ModelContainer?
 
+    public init() {}
+
     /// Resolves to <repo>/models/gemma-4-26b-a4b-it-4bit at compile time.
+    /// Walks up from `Packages/AgentCore/Sources/AgentCore/InferenceEngine.swift`
+    /// (5 levels) to the repo root, then appends `models/...`.
     private static var modelDirectory: URL {
         URL(fileURLWithPath: #filePath)
-            .deletingLastPathComponent()  // Agent/
-            .deletingLastPathComponent()  // localCode/
+            .deletingLastPathComponent()  // AgentCore/ (folder)
+            .deletingLastPathComponent()  // Sources/
+            .deletingLastPathComponent()  // AgentCore/ (package)
+            .deletingLastPathComponent()  // Packages/
             .deletingLastPathComponent()  // repo root
             .appendingPathComponent("models/gemma-4-26b-a4b-it-4bit")
     }
 
-    var modelName: String { Self.modelDirectory.lastPathComponent }
+    public var modelName: String { Self.modelDirectory.lastPathComponent }
 
-    func load() async {
+    public func load() async {
         guard state != .ready, state != .loading else { return }
         state = .loading
         contextWindow = Self.readContextWindow() ?? 8192
@@ -64,21 +70,29 @@ final class InferenceEngine {
         AsyncStream { continuation in
             let task = Task { [container] in
                 guard let container else { continuation.finish(); return }
-                let chat: [Chat.Message] = messages.map { msg in
+                let chat: [Chat.Message] = messages.compactMap { msg in
                     switch msg.role {
-                    case .system:    .system(msg.text)
-                    case .user:      .user(msg.text)
-                    case .assistant: .assistant(msg.text)
-                    case .tool:      .tool(msg.text)
+                    case .system: return .system(msg.text)
+                    case .user:   return .user(msg.text)
+                    case .tool:   return nil    // bundled into the preceding assistant turn
+                    case .assistant:
+                        var content = msg.text
+                        if let call = msg.toolCall {
+                            if !content.isEmpty && !content.hasSuffix("\n") { content += "\n" }
+                            content += GemmaWireFormat.serialize(call)
+                            if let result = msg.toolResult {
+                                content += GemmaWireFormat.serializeResponse(
+                                    toolName: call.name, output: result)
+                            }
+                        }
+                        return .assistant(content)
                     }
                 }
-                let input = UserInput(
-                    chat: chat,
-                    tools: tools.isEmpty ? nil : tools
-                )
                 let params = GenerateParameters(maxTokens: 4096, temperature: 0.7)
                 do {
-                    let lmInput = try await container.prepare(input: input)
+                    let lmInput = try await container.prepare(
+                        input: UserInput(chat: chat, tools: tools.isEmpty ? nil : tools)
+                    )
                     let prompt = lmInput.text.tokens.size
                     await MainActor.run { self.tokenCount = prompt }
                     let stream = try await container.generate(input: lmInput, parameters: params)

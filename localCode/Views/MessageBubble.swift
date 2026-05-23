@@ -1,3 +1,4 @@
+import AgentCore
 import SwiftUI
 
 struct MessageBubble: View {

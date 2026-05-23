@@ -2,13 +2,13 @@ import Foundation
 
 @Observable
 @MainActor
-final class AgentLoop {
-    let cwd: URL
+public final class AgentLoop {
+    public let cwd: URL
     private let engine: InferenceEngine
     private let registry: ToolRegistry
-    var messages: [Message]
+    public var messages: [Message]
 
-    init(cwd: URL, engine: InferenceEngine) {
+    public init(cwd: URL, engine: InferenceEngine) {
         self.cwd = cwd
         self.engine = engine
         self.registry = ToolRegistry([
@@ -23,7 +23,7 @@ final class AgentLoop {
 
     /// Mirrors the Python s02 `while True`: stream → on tool call, dispatch and loop;
     /// on plain text completion, exit.
-    func send(_ userText: String) async {
+    public func send(_ userText: String) async {
         messages.append(.user(userText))
         while true {
             let snapshot = messages
@@ -48,7 +48,9 @@ final class AgentLoop {
             let output = await registry.dispatch(name: call.name, arguments: call.arguments)
             messages[assistantIdx].toolCall = call
             messages[assistantIdx].toolResult = output
-            messages.append(.tool(output))
+            // No separate `.tool(_)` message — the result is bundled into the
+            // assistant turn's content when we re-render for the next generation
+            // (see InferenceEngine.stream chat-mapping).
         }
     }
 }

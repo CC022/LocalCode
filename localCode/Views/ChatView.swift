@@ -1,3 +1,4 @@
+import AgentCore
 import SwiftUI
 import UniformTypeIdentifiers
 
@@ -52,6 +53,39 @@ private struct StatusBar: View {
         }
     }
 
+    private var contextFraction: Double {
+        let cw = app.engine.contextWindow
+        guard cw > 0 else { return 0 }
+        return min(1, max(0, Double(app.engine.tokenCount) / Double(cw)))
+    }
+
+    @ViewBuilder
+    private var statusContent: some View {
+        switch app.engine.state {
+        case .ready:
+            HStack(spacing: 6) {
+                Text("Ready")
+                Text("·").foregroundStyle(.tertiary)
+                Text(app.engine.modelName).foregroundStyle(.secondary)
+                Text("·").foregroundStyle(.tertiary)
+                ProgressView(value: contextFraction)
+                    .progressViewStyle(.circular)
+                    .controlSize(.mini)
+                Text("\(formatTokens(app.engine.tokenCount))/\(formatTokens(app.engine.contextWindow))")
+                    .foregroundStyle(.secondary)
+                    .font(.system(.callout, design: .monospaced))
+            }
+            .font(.callout)
+        default:
+            Text(statusString)
+                .font(.callout)
+                .foregroundStyle(textColor)
+                .lineLimit(1)
+                .truncationMode(.middle)
+                .textSelection(.enabled)
+        }
+    }
+
     private func formatTokens(_ n: Int) -> String {
         switch n {
         case 0..<1_000:           "\(n)"
@@ -64,17 +98,10 @@ private struct StatusBar: View {
     var body: some View {
         HStack(spacing: 8) {
             statusIcon
-            Text(statusString)
-                .font(.callout)
-                .foregroundStyle(textColor)
-                .lineLimit(1)
-                .truncationMode(.middle)
-                .textSelection(.enabled)
+            statusContent
                 .help(statusString)
                 .contextMenu {
-                    Button("Copy") {
-                        copy(statusString)
-                    }
+                    Button("Copy") { copy(statusString) }
                 }
             Spacer()
             copyButton

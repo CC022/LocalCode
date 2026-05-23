@@ -15,16 +15,24 @@
 		A100000000000000000F0006 /* Tokenizers in Frameworks */ = {isa = PBXBuildFile; productRef = A200000000000000000F0006 /* Tokenizers */; };
 		A100000000000000000F0007 /* MLXVLM in Frameworks */ = {isa = PBXBuildFile; productRef = A200000000000000000F0007 /* MLXVLM */; };
 		A100000000000000000F0008 /* MLX in Frameworks */ = {isa = PBXBuildFile; productRef = A200000000000000000F0008 /* MLX */; };
+		A100000000000000000F0009 /* AgentCore in Frameworks */ = {isa = PBXBuildFile; productRef = A200000000000000000F0009 /* AgentCore */; };
+		B100000000000000000F0001 /* AgentCore in Frameworks */ = {isa = PBXBuildFile; productRef = B200000000000000000F0001 /* AgentCore */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
 		324E308C2FC1620B0016F244 /* localCode.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = localCode.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		B100000000000000000F0010 /* LocalCodeCLI */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = LocalCodeCLI; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		324E308E2FC1620B0016F244 /* localCode */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = localCode;
+			sourceTree = "<group>";
+		};
+		B100000000000000000F0002 /* localCodeCLI */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = localCodeCLI;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -42,6 +50,15 @@
 				A100000000000000000F0006 /* Tokenizers in Frameworks */,
 				A100000000000000000F0007 /* MLXVLM in Frameworks */,
 				A100000000000000000F0008 /* MLX in Frameworks */,
+				A100000000000000000F0009 /* AgentCore in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		B100000000000000000F0004 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				B100000000000000000F0001 /* AgentCore in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -60,6 +77,7 @@
 			isa = PBXGroup;
 			children = (
 				324E308C2FC1620B0016F244 /* localCode.app */,
+				B100000000000000000F0010 /* LocalCodeCLI */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -67,6 +85,28 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		B100000000000000000F0011 /* LocalCodeCLI */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = B100000000000000000F0005 /* Build configuration list for PBXNativeTarget "LocalCodeCLI" */;
+			buildPhases = (
+				B100000000000000000F0003 /* Sources */,
+				B100000000000000000F0004 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				B100000000000000000F0002 /* localCodeCLI */,
+			);
+			name = LocalCodeCLI;
+			packageProductDependencies = (
+				B200000000000000000F0001 /* AgentCore */,
+			);
+			productName = LocalCodeCLI;
+			productReference = B100000000000000000F0010 /* LocalCodeCLI */;
+			productType = "com.apple.product-type.tool";
+		};
 		324E308B2FC1620B0016F244 /* localCode */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = 324E30972FC1620C0016F244 /* Build configuration list for PBXNativeTarget "localCode" */;
@@ -92,6 +132,7 @@
 				A200000000000000000F0006 /* Tokenizers */,
 				A200000000000000000F0007 /* MLXVLM */,
 				A200000000000000000F0008 /* MLX */,
+				A200000000000000000F0009 /* AgentCore */,
 			);
 			productName = localCode;
 			productReference = 324E308C2FC1620B0016F244 /* localCode.app */;
@@ -126,6 +167,7 @@
 				A300000000000000000F0002 /* XCRemoteSwiftPackageReference "swift-huggingface" */,
 				A300000000000000000F0003 /* XCRemoteSwiftPackageReference "swift-transformers" */,
 				A300000000000000000F0004 /* XCRemoteSwiftPackageReference "mlx-swift" */,
+				A300000000000000000F0005 /* XCLocalSwiftPackageReference "Packages/AgentCore" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 324E308D2FC1620B0016F244 /* Products */;
@@ -133,6 +175,7 @@
 			projectRoot = "";
 			targets = (
 				324E308B2FC1620B0016F244 /* localCode */,
+				B100000000000000000F0011 /* LocalCodeCLI */,
 			);
 		};
 /* End PBXProject section */
@@ -149,6 +192,13 @@
 
 /* Begin PBXSourcesBuildPhase section */
 		324E30882FC1620B0016F244 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		B100000000000000000F0003 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -310,6 +360,38 @@
 			};
 			name = Debug;
 		};
+		B100000000000000000F0006 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = UBW92G68L5;
+				ENABLE_APP_SANDBOX = NO;
+				ENABLE_HARDENED_RUNTIME = NO;
+				MACOSX_DEPLOYMENT_TARGET = 26.5;
+				PRODUCT_BUNDLE_IDENTIFIER = com.kojima.LocalCodeCLI;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		B100000000000000000F0007 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = UBW92G68L5;
+				ENABLE_APP_SANDBOX = NO;
+				ENABLE_HARDENED_RUNTIME = NO;
+				MACOSX_DEPLOYMENT_TARGET = 26.5;
+				PRODUCT_BUNDLE_IDENTIFIER = com.kojima.LocalCodeCLI;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
 		324E30992FC1620C0016F244 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -363,6 +445,15 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
+		B100000000000000000F0005 /* Build configuration list for PBXNativeTarget "LocalCodeCLI" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				B100000000000000000F0006 /* Debug */,
+				B100000000000000000F0007 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
@@ -370,8 +461,8 @@
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/ml-explore/mlx-swift-lm.git";
 			requirement = {
-				kind = upToNextMajorVersion;
-				minimumVersion = 3.31.3;
+				kind = revision;
+				revision = 82d9cd619a78714dba9d474dbc1c75c65622e710;
 			};
 		};
 		A300000000000000000F0002 /* XCRemoteSwiftPackageReference "swift-huggingface" */ = {
@@ -441,7 +532,24 @@
 			package = A300000000000000000F0004 /* XCRemoteSwiftPackageReference "mlx-swift" */;
 			productName = MLX;
 		};
+		A200000000000000000F0009 /* AgentCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A300000000000000000F0005 /* XCLocalSwiftPackageReference "Packages/AgentCore" */;
+			productName = AgentCore;
+		};
+		B200000000000000000F0001 /* AgentCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A300000000000000000F0005 /* XCLocalSwiftPackageReference "Packages/AgentCore" */;
+			productName = AgentCore;
+		};
 /* End XCSwiftPackageProductDependency section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		A300000000000000000F0005 /* XCLocalSwiftPackageReference "Packages/AgentCore" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/AgentCore;
+		};
+/* End XCLocalSwiftPackageReference section */
 	};
 	rootObject = 324E30842FC1620B0016F244 /* Project object */;
 }
