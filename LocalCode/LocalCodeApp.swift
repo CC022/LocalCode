@@ -1,7 +1,7 @@
 import SwiftUI
 
 @main
-struct localCodeApp: App {
+struct LocalCodeApp: App {
     @State private var app = AppState()
 
     var body: some Scene {

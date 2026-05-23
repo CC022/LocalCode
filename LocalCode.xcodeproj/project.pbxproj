@@ -16,23 +16,24 @@
 		A100000000000000000F0007 /* MLXVLM in Frameworks */ = {isa = PBXBuildFile; productRef = A200000000000000000F0007 /* MLXVLM */; };
 		A100000000000000000F0008 /* MLX in Frameworks */ = {isa = PBXBuildFile; productRef = A200000000000000000F0008 /* MLX */; };
 		A100000000000000000F0009 /* AgentCore in Frameworks */ = {isa = PBXBuildFile; productRef = A200000000000000000F0009 /* AgentCore */; };
+		A100000000000000000F0011 /* Markdown in Frameworks */ = {isa = PBXBuildFile; productRef = A200000000000000000F0011 /* Markdown */; };
 		B100000000000000000F0001 /* AgentCore in Frameworks */ = {isa = PBXBuildFile; productRef = B200000000000000000F0001 /* AgentCore */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
-		324E308C2FC1620B0016F244 /* localCode.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = localCode.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		324E308C2FC1620B0016F244 /* LocalCode.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = LocalCode.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		B100000000000000000F0010 /* LocalCodeCLI */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = LocalCodeCLI; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
-		324E308E2FC1620B0016F244 /* localCode */ = {
+		324E308E2FC1620B0016F244 /* LocalCode */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			path = localCode;
+			path = LocalCode;
 			sourceTree = "<group>";
 		};
-		B100000000000000000F0002 /* localCodeCLI */ = {
+		B100000000000000000F0002 /* LocalCodeCLI */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			path = localCodeCLI;
+			path = LocalCodeCLI;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -51,6 +52,7 @@
 				A100000000000000000F0007 /* MLXVLM in Frameworks */,
 				A100000000000000000F0008 /* MLX in Frameworks */,
 				A100000000000000000F0009 /* AgentCore in Frameworks */,
+				A100000000000000000F0011 /* Markdown in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -68,7 +70,7 @@
 		324E30832FC1620B0016F244 = {
 			isa = PBXGroup;
 			children = (
-				324E308E2FC1620B0016F244 /* localCode */,
+				324E308E2FC1620B0016F244 /* LocalCode */,
 				324E308D2FC1620B0016F244 /* Products */,
 				32B6C1CF2FC21BFC00403977 /* Recovered References */,
 			);
@@ -77,7 +79,7 @@
 		324E308D2FC1620B0016F244 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				324E308C2FC1620B0016F244 /* localCode.app */,
+				324E308C2FC1620B0016F244 /* LocalCode.app */,
 				B100000000000000000F0010 /* LocalCodeCLI */,
 			);
 			name = Products;
@@ -86,7 +88,7 @@
 		32B6C1CF2FC21BFC00403977 /* Recovered References */ = {
 			isa = PBXGroup;
 			children = (
-				B100000000000000000F0002 /* localCodeCLI */,
+				B100000000000000000F0002 /* LocalCodeCLI */,
 			);
 			name = "Recovered References";
 			sourceTree = "<group>";
@@ -94,9 +96,9 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		324E308B2FC1620B0016F244 /* localCode */ = {
+		324E308B2FC1620B0016F244 /* LocalCode */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 324E30972FC1620C0016F244 /* Build configuration list for PBXNativeTarget "localCode" */;
+			buildConfigurationList = 324E30972FC1620C0016F244 /* Build configuration list for PBXNativeTarget "LocalCode" */;
 			buildPhases = (
 				324E30882FC1620B0016F244 /* Sources */,
 				324E30892FC1620B0016F244 /* Frameworks */,
@@ -107,9 +109,9 @@
 			dependencies = (
 			);
 			fileSystemSynchronizedGroups = (
-				324E308E2FC1620B0016F244 /* localCode */,
+				324E308E2FC1620B0016F244 /* LocalCode */,
 			);
-			name = localCode;
+			name = LocalCode;
 			packageProductDependencies = (
 				A200000000000000000F0001 /* MLXLLM */,
 				A200000000000000000F0002 /* MLXLMCommon */,
@@ -120,9 +122,10 @@
 				A200000000000000000F0007 /* MLXVLM */,
 				A200000000000000000F0008 /* MLX */,
 				A200000000000000000F0009 /* AgentCore */,
+				A200000000000000000F0011 /* Markdown */,
 			);
-			productName = localCode;
-			productReference = 324E308C2FC1620B0016F244 /* localCode.app */;
+			productName = LocalCode;
+			productReference = 324E308C2FC1620B0016F244 /* LocalCode.app */;
 			productType = "com.apple.product-type.application";
 		};
 		B100000000000000000F0011 /* LocalCodeCLI */ = {
@@ -137,7 +140,7 @@
 			dependencies = (
 			);
 			fileSystemSynchronizedGroups = (
-				B100000000000000000F0002 /* localCodeCLI */,
+				B100000000000000000F0002 /* LocalCodeCLI */,
 			);
 			name = LocalCodeCLI;
 			packageProductDependencies = (
@@ -162,7 +165,7 @@
 					};
 				};
 			};
-			buildConfigurationList = 324E30872FC1620B0016F244 /* Build configuration list for PBXProject "localCode" */;
+			buildConfigurationList = 324E30872FC1620B0016F244 /* Build configuration list for PBXProject "LocalCode" */;
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
 			knownRegions = (
@@ -177,13 +180,14 @@
 				A300000000000000000F0003 /* XCRemoteSwiftPackageReference "swift-transformers" */,
 				A300000000000000000F0004 /* XCRemoteSwiftPackageReference "mlx-swift" */,
 				A300000000000000000F0005 /* XCLocalSwiftPackageReference "Packages/AgentCore" */,
+				A300000000000000000F0011 /* XCRemoteSwiftPackageReference "swift-markdown" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 324E308D2FC1620B0016F244 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				324E308B2FC1620B0016F244 /* localCode */,
+				324E308B2FC1620B0016F244 /* LocalCode */,
 				B100000000000000000F0011 /* LocalCodeCLI */,
 			);
 		};
@@ -342,7 +346,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CODE_SIGN_ENTITLEMENTS = localCode/localCode.entitlements;
+				CODE_SIGN_ENTITLEMENTS = LocalCode/LocalCode.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
@@ -357,7 +361,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.kojima.localCode;
+				PRODUCT_BUNDLE_IDENTIFIER = com.kojima.LocalCode;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
@@ -374,7 +378,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CODE_SIGN_ENTITLEMENTS = localCode/localCode.entitlements;
+				CODE_SIGN_ENTITLEMENTS = LocalCode/LocalCode.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
@@ -389,7 +393,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.kojima.localCode;
+				PRODUCT_BUNDLE_IDENTIFIER = com.kojima.LocalCode;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
@@ -436,7 +440,7 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		324E30872FC1620B0016F244 /* Build configuration list for PBXProject "localCode" */ = {
+		324E30872FC1620B0016F244 /* Build configuration list for PBXProject "LocalCode" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				324E30952FC1620C0016F244 /* Debug */,
@@ -445,7 +449,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		324E30972FC1620C0016F244 /* Build configuration list for PBXNativeTarget "localCode" */ = {
+		324E30972FC1620C0016F244 /* Build configuration list for PBXNativeTarget "LocalCode" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				324E30982FC1620C0016F244 /* Debug */,
@@ -505,6 +509,14 @@
 				minimumVersion = 0.31.3;
 			};
 		};
+		A300000000000000000F0011 /* XCRemoteSwiftPackageReference "swift-markdown" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/apple/swift-markdown";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 0.4.0;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -552,6 +564,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = A300000000000000000F0005 /* XCLocalSwiftPackageReference "Packages/AgentCore" */;
 			productName = AgentCore;
+		};
+		A200000000000000000F0011 /* Markdown */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A300000000000000000F0011 /* XCRemoteSwiftPackageReference "swift-markdown" */;
+			productName = Markdown;
 		};
 		B200000000000000000F0001 /* AgentCore */ = {
 			isa = XCSwiftPackageProductDependency;

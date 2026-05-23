@@ -60,7 +60,7 @@ final class AppState {
     /// Format the full chat (including hidden tool_result messages) for debugging.
     func exportTranscript() -> String {
         guard let loop else { return "(no chat yet)" }
-        var out = "# localCode transcript\ncwd: \(loop.cwd.path)\n"
+        var out = "# LocalCode transcript\ncwd: \(loop.cwd.path)\n"
         for msg in loop.messages {
             let role: String = switch msg.role {
             case .system:    "SYSTEM"

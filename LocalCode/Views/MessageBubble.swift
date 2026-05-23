@@ -32,7 +32,7 @@ struct MessageBubble: View {
     private var content: some View {
         let pre = message.text.trimmingCharacters(in: .whitespacesAndNewlines)
         if !pre.isEmpty {
-            Text(pre).textSelection(.enabled)
+            MarkdownView(source: pre).textSelection(.enabled)
         }
         if let call = message.toolCall {
             if let req = pendingApproval {

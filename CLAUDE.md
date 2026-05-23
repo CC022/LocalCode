@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this project is
 
-`localCode` is a SwiftUI macOS app that runs a coding agent **entirely on-device** using Apple's MLX framework. It mirrors Claude Code's UX (pick a working directory → chat with an agent that can run shell + file tools in that directory) but with a local LLM and no network calls during inference.
+`LocalCode` is a SwiftUI macOS app that runs a coding agent **entirely on-device** using Apple's MLX framework. It mirrors Claude Code's UX (pick a working directory → chat with an agent that can run shell + file tools in that directory) but with a local LLM and no network calls during inference.
 
 The Swift app is being built as a **step-by-step port of the Python tutorial in `learn-claude-code-main/`** (chapters `s01_agent_loop` … `s20_comprehensive`). Each step lands one tutorial chapter. Current state: through **s02 (tool use)** with five tools (bash, read_file, write_file, edit_file, glob) wired through a registry.
 
@@ -15,7 +15,7 @@ The active model is **`mlx-community/gemma-4-26b-a4b-it-4bit`** (Gemma 4 26B MoE
 ```bash
 # Build (the -skipMacroValidation flag is required because mlx-swift-lm uses
 # a Swift macro plugin that Xcode otherwise asks to "Trust & Enable" on first run)
-xcodebuild -project localCode.xcodeproj -scheme localCode \
+xcodebuild -project LocalCode.xcodeproj -scheme LocalCode \
   -configuration Debug -destination 'platform=macOS' \
   -skipMacroValidation build
 
@@ -27,14 +27,14 @@ pip install -U huggingface_hub
 python3 scripts/download_model.py
 
 # Run the app: open the Xcode project and ⌘R, or launch the built binary at
-# ~/Library/Developer/Xcode/DerivedData/localCode-*/Build/Products/Debug/localCode.app
+# ~/Library/Developer/Xcode/DerivedData/LocalCode-*/Build/Products/Debug/LocalCode.app
 ```
 
 There are **no tests** yet — verification is manual through the chat UI.
 
 ## Architecture
 
-The code splits into three layers under `localCode/`:
+The code splits into three layers under `LocalCode/`:
 
 - **`Agent/`** — the model-driven loop and the tools it can call. Pure logic, no SwiftUI.
 - **`ViewModels/AppState.swift`** — single `@Observable @MainActor` glue object exposed via SwiftUI `@Environment`.
@@ -99,7 +99,7 @@ The status bar in `ChatView` reads all of these.
 
 ### Model path resolution
 
-The model directory is resolved at **compile time** via `#filePath` walking up from `localCode/Agent/InferenceEngine.swift` to the repo root and appending `models/gemma-4-26b-a4b-it-4bit`. This works during Xcode development but would need replacement (env var, bundle resource, user picker) for a shipped binary.
+The model directory is resolved at **compile time** via `#filePath` walking up from `LocalCode/Agent/InferenceEngine.swift` to the repo root and appending `models/gemma-4-26b-a4b-it-4bit`. This works during Xcode development but would need replacement (env var, bundle resource, user picker) for a shipped binary.
 
 ### Background warm-up
 
@@ -111,7 +111,7 @@ The model directory is resolved at **compile time** via `#filePath` walking up f
 
 ## Swift Package Management
 
-Dependencies are wired by directly editing **`localCode.xcodeproj/project.pbxproj`** (there is no `Package.swift`). Four SPM packages are linked:
+Dependencies are wired by directly editing **`LocalCode.xcodeproj/project.pbxproj`** (there is no `Package.swift`). Four SPM packages are linked:
 
 | Package | URL | Products linked |
 |---|---|---|
@@ -133,7 +133,7 @@ Existing entries use `A100…`, `A200…`, `A300…` UUID prefixes — pick a fr
 ## Platform constraints
 
 - macOS 26.5 deployment target. Apple Silicon only (MLX is Metal).
-- Hardened runtime on, app sandbox **off**. Entitlements at `localCode/localCode.entitlements` allow JIT, unsigned executable memory, disable library validation, and dyld env vars — all required for MLX's Metal JIT and for spawning child processes via `BashTool`.
+- Hardened runtime on, app sandbox **off**. Entitlements at `LocalCode/LocalCode.entitlements` allow JIT, unsigned executable memory, disable library validation, and dyld env vars — all required for MLX's Metal JIT and for spawning child processes via `BashTool`.
 - Project-wide `SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor`. Code outside SwiftUI views (especially `Tool.run`, `InferenceEngine.stream`'s internal Task) must be explicitly `nonisolated` to escape main-thread isolation.
 
 ## Tutorial reference

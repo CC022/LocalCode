@@ -15,25 +15,42 @@ struct ChatView: View {
         }
     }
 
+    /// Changes when a new message is appended OR when the last message's text
+    /// grows during streaming. Used as a single trigger for auto-scroll.
+    private var scrollSignal: Int {
+        guard let msgs = app.loop?.messages else { return 0 }
+        let last = msgs.last(where: { !$0.isHiddenInUI })
+        return msgs.count * 1_000_000 + (last?.text.count ?? 0)
+    }
+
     private var messagesScroll: some View {
-        ScrollView {
-            LazyVStack(alignment: .leading, spacing: 12) {
-                if let loop = app.loop {
-                    ForEach(loop.messages.filter { !$0.isHiddenInUI }) { msg in
-                        MessageBubble(message: msg).id(msg.id)
+        ScrollViewReader { proxy in
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 12) {
+                    if let loop = app.loop {
+                        ForEach(loop.messages.filter { !$0.isHiddenInUI }) { msg in
+                            MessageBubble(message: msg).id(msg.id)
+                        }
                     }
+                    // Invisible anchor — `defaultScrollAnchor` alone misses
+                    // updates inside a LazyVStack, so we scrollTo this id.
+                    Color.clear.frame(height: 1).id(Self.bottomID)
+                }
+                .padding()
+                // Push the stack to the bottom so the first message starts at
+                // the bottom rather than the top.
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+            }
+            .defaultScrollAnchor(.bottom)
+            .onChange(of: scrollSignal) {
+                withAnimation(.easeOut(duration: 0.15)) {
+                    proxy.scrollTo(Self.bottomID, anchor: .bottom)
                 }
             }
-            .padding()
-            // Push the stack to the bottom so the first message starts there
-            // rather than the top, before any anchor work.
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
         }
-        // Pin the scroll position to the bottom: initial view shows the latest
-        // message and the view auto-follows as content grows (e.g., during
-        // streaming or when a new bubble is appended).
-        .defaultScrollAnchor(.bottom)
     }
+
+    private static let bottomID = "chat-bottom"
 }
 
 private struct StatusBar: View {
