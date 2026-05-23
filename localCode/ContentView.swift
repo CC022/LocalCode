@@ -1,24 +1,16 @@
-//
-//  ContentView.swift
-//  localCode
-//
-//  Created by zzc on 5/22/26.
-//
-
 import SwiftUI
 
 struct ContentView: View {
-    var body: some View {
-        VStack {
-            Image(systemName: "globe")
-                .imageScale(.large)
-                .foregroundStyle(.tint)
-            Text("Hello, world!")
-        }
-        .padding()
-    }
-}
+    @Environment(AppState.self) private var app
 
-#Preview {
-    ContentView()
+    var body: some View {
+        Group {
+            if app.cwd == nil {
+                DirectoryPicker()
+            } else {
+                ChatView()
+            }
+        }
+        .frame(minWidth: 700, minHeight: 500)
+    }
 }

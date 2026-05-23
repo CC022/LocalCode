@@ -1,17 +1,13 @@
-//
-//  localCodeApp.swift
-//  localCode
-//
-//  Created by zzc on 5/22/26.
-//
-
 import SwiftUI
 
 @main
 struct localCodeApp: App {
+    @State private var app = AppState()
+
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            ContentView().environment(app)
         }
+        .defaultSize(width: 900, height: 700)
     }
 }

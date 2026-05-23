@@ -1,0 +1,19 @@
+# MLX model weights — too large for git
+models/
+
+# Xcode
+.DS_Store
+build/
+DerivedData/
+*.xcuserstate
+*.xcuserdatad/
+xcuserdata/
+
+# Swift Package Manager
+.swiftpm/
+Package.resolved
+
+# Python
+__pycache__/
+*.pyc
+.venv/
