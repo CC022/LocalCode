@@ -14,6 +14,7 @@
 		A100000000000000000F0005 /* HuggingFace in Frameworks */ = {isa = PBXBuildFile; productRef = A200000000000000000F0005 /* HuggingFace */; };
 		A100000000000000000F0006 /* Tokenizers in Frameworks */ = {isa = PBXBuildFile; productRef = A200000000000000000F0006 /* Tokenizers */; };
 		A100000000000000000F0007 /* MLXVLM in Frameworks */ = {isa = PBXBuildFile; productRef = A200000000000000000F0007 /* MLXVLM */; };
+		A100000000000000000F0008 /* MLX in Frameworks */ = {isa = PBXBuildFile; productRef = A200000000000000000F0008 /* MLX */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -40,6 +41,7 @@
 				A100000000000000000F0005 /* HuggingFace in Frameworks */,
 				A100000000000000000F0006 /* Tokenizers in Frameworks */,
 				A100000000000000000F0007 /* MLXVLM in Frameworks */,
+				A100000000000000000F0008 /* MLX in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -89,6 +91,7 @@
 				A200000000000000000F0005 /* HuggingFace */,
 				A200000000000000000F0006 /* Tokenizers */,
 				A200000000000000000F0007 /* MLXVLM */,
+				A200000000000000000F0008 /* MLX */,
 			);
 			productName = localCode;
 			productReference = 324E308C2FC1620B0016F244 /* localCode.app */;
@@ -122,6 +125,7 @@
 				A300000000000000000F0001 /* XCRemoteSwiftPackageReference "mlx-swift-lm" */,
 				A300000000000000000F0002 /* XCRemoteSwiftPackageReference "swift-huggingface" */,
 				A300000000000000000F0003 /* XCRemoteSwiftPackageReference "swift-transformers" */,
+				A300000000000000000F0004 /* XCRemoteSwiftPackageReference "mlx-swift" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 324E308D2FC1620B0016F244 /* Products */;
@@ -386,6 +390,14 @@
 				minimumVersion = 1.3.0;
 			};
 		};
+		A300000000000000000F0004 /* XCRemoteSwiftPackageReference "mlx-swift" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/ml-explore/mlx-swift";
+			requirement = {
+				kind = upToNextMinorVersion;
+				minimumVersion = 0.31.3;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -423,6 +435,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = A300000000000000000F0001 /* XCRemoteSwiftPackageReference "mlx-swift-lm" */;
 			productName = MLXVLM;
+		};
+		A200000000000000000F0008 /* MLX */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A300000000000000000F0004 /* XCRemoteSwiftPackageReference "mlx-swift" */;
+			productName = MLX;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

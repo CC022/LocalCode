@@ -17,13 +17,11 @@ struct MessageBubble: View {
 
     @ViewBuilder
     private var content: some View {
+        let pre = message.text.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !pre.isEmpty {
+            Text(pre).textSelection(.enabled)
+        }
         if let call = message.toolCall {
-            let pre = message.text
-                .components(separatedBy: "```tool_use").first?
-                .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-            if !pre.isEmpty {
-                Text(pre).textSelection(.enabled)
-            }
             DisclosureGroup {
                 ScrollView {
                     Text(message.toolResult ?? "(no output)")
@@ -33,22 +31,22 @@ struct MessageBubble: View {
                 }
                 .frame(maxHeight: 300)
             } label: {
-                Text("$ \(call.command)")
+                Text(call.summary)
                     .font(.system(.caption, design: .monospaced))
                     .lineLimit(1)
                     .truncationMode(.middle)
             }
-        } else {
-            Text(message.text.isEmpty ? "…" : message.text)
-                .textSelection(.enabled)
+        }
+        if pre.isEmpty && message.toolCall == nil {
+            Text("…").foregroundStyle(.secondary)
         }
     }
 
     private var background: AnyShapeStyle {
         switch message.role {
-        case .user:      AnyShapeStyle(Color.accentColor.opacity(0.18))
-        case .assistant: AnyShapeStyle(Color.gray.opacity(0.12))
-        case .system:    AnyShapeStyle(Color.clear)
+        case .user:                AnyShapeStyle(Color.accentColor.opacity(0.18))
+        case .assistant:           AnyShapeStyle(Color.gray.opacity(0.12))
+        case .system, .tool:       AnyShapeStyle(Color.clear)
         }
     }
 }

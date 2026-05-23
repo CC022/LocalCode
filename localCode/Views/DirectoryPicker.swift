@@ -18,6 +18,8 @@ struct DirectoryPicker: View {
             Button("Choose Folder…") { showing = true }
                 .buttonStyle(.borderedProminent)
                 .controlSize(.large)
+            modelStatus
+                .padding(.top, 12)
         }
         .padding(40)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -26,6 +28,33 @@ struct DirectoryPicker: View {
             allowedContentTypes: [.folder]
         ) { result in
             if case .success(let url) = result { app.pickDirectory(url) }
+        }
+    }
+
+    @ViewBuilder
+    private var modelStatus: some View {
+        switch app.engine.state {
+        case .idle, .loading:
+            HStack(spacing: 6) {
+                ProgressView().controlSize(.small)
+                Text("Loading model in background…")
+            }
+            .font(.callout)
+            .foregroundStyle(.secondary)
+        case .ready:
+            HStack(spacing: 6) {
+                Image(systemName: "circle.fill").foregroundStyle(.green).font(.caption2)
+                Text("Model ready")
+            }
+            .font(.callout)
+            .foregroundStyle(.secondary)
+        case .failed(let msg):
+            Text(msg)
+                .font(.callout)
+                .foregroundStyle(.red)
+                .lineLimit(2)
+                .multilineTextAlignment(.center)
+                .textSelection(.enabled)
         }
     }
 }

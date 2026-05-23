@@ -15,10 +15,14 @@ final class AppState {
             && !input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
+    init() {
+        // Start warming the model immediately — don't wait for the user to pick a folder.
+        Task { await engine.load() }
+    }
+
     func pickDirectory(_ url: URL) {
         cwd = url
         loop = AgentLoop(cwd: url, engine: engine)
-        Task { await engine.load() }
     }
 
     func send() async {
@@ -28,5 +32,21 @@ final class AppState {
         isStreaming = true
         await loop.send(text)
         isStreaming = false
+    }
+
+    /// Format the full chat (including hidden tool_result messages) for debugging.
+    func exportTranscript() -> String {
+        guard let loop else { return "(no chat yet)" }
+        var out = "# localCode transcript\ncwd: \(loop.cwd.path)\n"
+        for msg in loop.messages {
+            let role: String = switch msg.role {
+            case .system:    "SYSTEM"
+            case .user:      "USER"
+            case .assistant: "ASSISTANT"
+            case .tool:      "TOOL"
+            }
+            out += "\n--- \(role) ---\n\(msg.text)\n"
+        }
+        return out
     }
 }

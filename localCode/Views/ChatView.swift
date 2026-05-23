@@ -1,4 +1,5 @@
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct ChatView: View {
     @Environment(AppState.self) private var app
@@ -36,13 +37,27 @@ struct ChatView: View {
 
 private struct StatusBar: View {
     @Environment(AppState.self) private var app
+    @State private var changingDir = false
+    @State private var justCopied = false
 
     private var statusString: String {
         switch app.engine.state {
-        case .idle:           "Idle"
-        case .loading:        "Loading model…"
-        case .ready:          "Ready"
-        case .failed(let m):  m
+        case .idle:           return "Idle"
+        case .loading:        return "Loading model…"
+        case .ready:
+            let used = formatTokens(app.engine.tokenCount)
+            let total = formatTokens(app.engine.contextWindow)
+            return "Ready · \(app.engine.modelName) · \(used)/\(total)"
+        case .failed(let m):  return m
+        }
+    }
+
+    private func formatTokens(_ n: Int) -> String {
+        switch n {
+        case 0..<1_000:           "\(n)"
+        case 1_000..<10_000:      String(format: "%.1fk", Double(n) / 1_000)
+        case 10_000..<1_000_000:  "\(n / 1_000)k"
+        default:                  String(format: "%.1fM", Double(n) / 1_000_000)
         }
     }
 
@@ -58,23 +73,55 @@ private struct StatusBar: View {
                 .help(statusString)
                 .contextMenu {
                     Button("Copy") {
-                        NSPasteboard.general.clearContents()
-                        NSPasteboard.general.setString(statusString, forType: .string)
+                        copy(statusString)
                     }
                 }
             Spacer()
+            copyButton
             if let cwd = app.cwd {
-                Image(systemName: "folder")
+                Button {
+                    changingDir = true
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "folder")
+                        Text(cwd.lastPathComponent).font(.caption)
+                    }
                     .foregroundStyle(.secondary)
-                Text(cwd.lastPathComponent)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .textSelection(.enabled)
+                }
+                .buttonStyle(.plain)
+                .help("Click to change working directory (resets chat)")
             }
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 8)
         .background(.bar)
+        .fileImporter(
+            isPresented: $changingDir,
+            allowedContentTypes: [.folder]
+        ) { result in
+            if case .success(let url) = result { app.pickDirectory(url) }
+        }
+    }
+
+    private var copyButton: some View {
+        Button {
+            copy(app.exportTranscript())
+            justCopied = true
+            Task {
+                try? await Task.sleep(for: .seconds(1.2))
+                justCopied = false
+            }
+        } label: {
+            Image(systemName: justCopied ? "checkmark" : "doc.on.clipboard")
+                .foregroundStyle(.secondary)
+        }
+        .buttonStyle(.plain)
+        .help("Copy full transcript to clipboard")
+    }
+
+    private func copy(_ s: String) {
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(s, forType: .string)
     }
 
     @ViewBuilder private var statusIcon: some View {

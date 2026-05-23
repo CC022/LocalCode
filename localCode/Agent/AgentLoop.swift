@@ -5,17 +5,24 @@ import Foundation
 final class AgentLoop {
     let cwd: URL
     private let engine: InferenceEngine
-    private let bash: BashTool
+    private let registry: ToolRegistry
     var messages: [Message]
 
     init(cwd: URL, engine: InferenceEngine) {
         self.cwd = cwd
         self.engine = engine
-        self.bash = BashTool(cwd: cwd)
+        self.registry = ToolRegistry([
+            BashTool(cwd: cwd),
+            ReadFileTool(cwd: cwd),
+            WriteFileTool(cwd: cwd),
+            EditFileTool(cwd: cwd),
+            GlobTool(cwd: cwd),
+        ])
         self.messages = [.system(SystemPrompt.make(cwd: cwd))]
     }
 
-    /// Mirrors the Python s01 `while True` loop: stream → parse → tool → repeat.
+    /// Mirrors the Python s02 `while True`: stream → on tool call, dispatch and loop;
+    /// on plain text completion, exit.
     func send(_ userText: String) async {
         messages.append(.user(userText))
         while true {
@@ -24,20 +31,24 @@ final class AgentLoop {
             messages.append(.assistant(""))
 
             var buffer = ""
-            for await delta in engine.stream(messages: snapshot) {
-                buffer += delta
-                messages[assistantIdx].text = buffer
+            var pendingCall: AgentToolCall?
+
+            for await event in engine.stream(messages: snapshot, tools: registry.toolSpecs) {
+                switch event {
+                case .text(let delta):
+                    buffer += delta
+                    messages[assistantIdx].text = buffer
+                case .toolCall(let mlxCall):
+                    pendingCall = AgentToolCall(mlxCall)
+                }
             }
 
-            guard let call = ToolParser.extract(buffer) else { return }
+            guard let call = pendingCall else { return }
 
-            let output = await bash.run(call.command)
+            let output = await registry.dispatch(name: call.name, arguments: call.arguments)
             messages[assistantIdx].toolCall = call
             messages[assistantIdx].toolResult = output
-
-            var resultMsg = Message.user(ToolParser.resultMessage(output))
-            resultMsg.isHiddenInUI = true
-            messages.append(resultMsg)
+            messages.append(.tool(output))
         }
     }
 }
