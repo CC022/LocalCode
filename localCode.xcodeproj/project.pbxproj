@@ -70,6 +70,7 @@
 			children = (
 				324E308E2FC1620B0016F244 /* localCode */,
 				324E308D2FC1620B0016F244 /* Products */,
+				32B6C1CF2FC21BFC00403977 /* Recovered References */,
 			);
 			sourceTree = "<group>";
 		};
@@ -82,31 +83,17 @@
 			name = Products;
 			sourceTree = "<group>";
 		};
+		32B6C1CF2FC21BFC00403977 /* Recovered References */ = {
+			isa = PBXGroup;
+			children = (
+				B100000000000000000F0002 /* localCodeCLI */,
+			);
+			name = "Recovered References";
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		B100000000000000000F0011 /* LocalCodeCLI */ = {
-			isa = PBXNativeTarget;
-			buildConfigurationList = B100000000000000000F0005 /* Build configuration list for PBXNativeTarget "LocalCodeCLI" */;
-			buildPhases = (
-				B100000000000000000F0003 /* Sources */,
-				B100000000000000000F0004 /* Frameworks */,
-			);
-			buildRules = (
-			);
-			dependencies = (
-			);
-			fileSystemSynchronizedGroups = (
-				B100000000000000000F0002 /* localCodeCLI */,
-			);
-			name = LocalCodeCLI;
-			packageProductDependencies = (
-				B200000000000000000F0001 /* AgentCore */,
-			);
-			productName = LocalCodeCLI;
-			productReference = B100000000000000000F0010 /* LocalCodeCLI */;
-			productType = "com.apple.product-type.tool";
-		};
 		324E308B2FC1620B0016F244 /* localCode */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = 324E30972FC1620C0016F244 /* Build configuration list for PBXNativeTarget "localCode" */;
@@ -137,6 +124,28 @@
 			productName = localCode;
 			productReference = 324E308C2FC1620B0016F244 /* localCode.app */;
 			productType = "com.apple.product-type.application";
+		};
+		B100000000000000000F0011 /* LocalCodeCLI */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = B100000000000000000F0005 /* Build configuration list for PBXNativeTarget "LocalCodeCLI" */;
+			buildPhases = (
+				B100000000000000000F0003 /* Sources */,
+				B100000000000000000F0004 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				B100000000000000000F0002 /* localCodeCLI */,
+			);
+			name = LocalCodeCLI;
+			packageProductDependencies = (
+				B200000000000000000F0001 /* AgentCore */,
+			);
+			productName = LocalCodeCLI;
+			productReference = B100000000000000000F0010 /* LocalCodeCLI */;
+			productType = "com.apple.product-type.tool";
 		};
 /* End PBXNativeTarget section */
 
@@ -360,38 +369,6 @@
 			};
 			name = Debug;
 		};
-		B100000000000000000F0006 /* Debug */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				CODE_SIGN_STYLE = Automatic;
-				DEVELOPMENT_TEAM = UBW92G68L5;
-				ENABLE_APP_SANDBOX = NO;
-				ENABLE_HARDENED_RUNTIME = NO;
-				MACOSX_DEPLOYMENT_TARGET = 26.5;
-				PRODUCT_BUNDLE_IDENTIFIER = com.kojima.LocalCodeCLI;
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				SDKROOT = macosx;
-				SKIP_INSTALL = YES;
-				SWIFT_VERSION = 5.0;
-			};
-			name = Debug;
-		};
-		B100000000000000000F0007 /* Release */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				CODE_SIGN_STYLE = Automatic;
-				DEVELOPMENT_TEAM = UBW92G68L5;
-				ENABLE_APP_SANDBOX = NO;
-				ENABLE_HARDENED_RUNTIME = NO;
-				MACOSX_DEPLOYMENT_TARGET = 26.5;
-				PRODUCT_BUNDLE_IDENTIFIER = com.kojima.LocalCodeCLI;
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				SDKROOT = macosx;
-				SKIP_INSTALL = YES;
-				SWIFT_VERSION = 5.0;
-			};
-			name = Release;
-		};
 		324E30992FC1620C0016F244 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -420,6 +397,38 @@
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+		B100000000000000000F0006 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = UBW92G68L5;
+				ENABLE_APP_SANDBOX = NO;
+				ENABLE_HARDENED_RUNTIME = NO;
+				MACOSX_DEPLOYMENT_TARGET = 26.5;
+				PRODUCT_BUNDLE_IDENTIFIER = com.kojima.LocalCodeCLI;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		B100000000000000000F0007 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = UBW92G68L5;
+				ENABLE_APP_SANDBOX = NO;
+				ENABLE_HARDENED_RUNTIME = NO;
+				MACOSX_DEPLOYMENT_TARGET = 26.5;
+				PRODUCT_BUNDLE_IDENTIFIER = com.kojima.LocalCodeCLI;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SKIP_INSTALL = YES;
 				SWIFT_VERSION = 5.0;
 			};
 			name = Release;
@@ -455,6 +464,13 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		A300000000000000000F0005 /* XCLocalSwiftPackageReference "Packages/AgentCore" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/AgentCore;
+		};
+/* End XCLocalSwiftPackageReference section */
 
 /* Begin XCRemoteSwiftPackageReference section */
 		A300000000000000000F0001 /* XCRemoteSwiftPackageReference "mlx-swift-lm" */ = {
@@ -543,13 +559,6 @@
 			productName = AgentCore;
 		};
 /* End XCSwiftPackageProductDependency section */
-
-/* Begin XCLocalSwiftPackageReference section */
-		A300000000000000000F0005 /* XCLocalSwiftPackageReference "Packages/AgentCore" */ = {
-			isa = XCLocalSwiftPackageReference;
-			relativePath = Packages/AgentCore;
-		};
-/* End XCLocalSwiftPackageReference section */
 	};
 	rootObject = 324E30842FC1620B0016F244 /* Project object */;
 }

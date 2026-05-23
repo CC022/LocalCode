@@ -1,6 +1,22 @@
 import AgentCore
 import Foundation
 
+func stderr(_ s: String) {
+    FileHandle.standardError.write(Data(s.utf8))
+}
+
+/// Synchronous stdin approval prompt. y = allow once, a = allow for session,
+/// anything else = deny. Defaulting to deny is the safer behavior for the CLI.
+func askApproval(_ request: ApprovalRequest) async -> ApprovalChoice {
+    stderr("\n⚠  \(request.reason)\n   \(request.call.summary)\n   Allow? [y / a (session) / N]: ")
+    let line = readLine(strippingNewline: true)?.trimmingCharacters(in: .whitespaces).lowercased() ?? ""
+    return switch line {
+    case "y", "yes": .once
+    case "a", "always": .session
+    default: .deny
+    }
+}
+
 @MainActor
 func printNewMessages(loop: AgentLoop, from: Int, to: Int) {
     for msg in loop.messages[from..<to] {
@@ -33,21 +49,25 @@ func run() async {
             : FileManager.default.currentDirectoryPath
     )
 
-    FileHandle.standardError.write(Data("Loading model from disk…\n".utf8))
+    stderr("Loading model from disk…\n")
     let engine = InferenceEngine()
     await engine.load()
     guard case .ready = engine.state else {
-        FileHandle.standardError.write(Data("Failed to load: \(engine.state)\n".utf8))
+        stderr("Failed to load: \(engine.state)\n")
         exit(1)
     }
-    FileHandle.standardError.write(Data(
-        "Ready · \(engine.modelName) · context \(engine.contextWindow)\n".utf8))
-    FileHandle.standardError.write(Data("cwd: \(cwd.path)\n\n".utf8))
+    stderr("Ready · \(engine.modelName) · context \(engine.contextWindow)\n")
+    stderr("cwd: \(cwd.path)\n\n")
 
-    let loop = AgentLoop(cwd: cwd, engine: engine)
+    let permission = Permission(ask: askApproval)
+    let hooks = HookRegistry()
+    hooks.register(preTool: BuiltinHooks.permission(permission))
+    hooks.register(postTool: BuiltinHooks.truncateLargeOutput())
+    hooks.register(stop: { stderr("[done]\n") })
+    let loop = AgentLoop(cwd: cwd, engine: engine, hooks: hooks)
 
     while true {
-        FileHandle.standardError.write(Data("> ".utf8))
+        stderr("> ")
         guard let line = readLine(strippingNewline: true) else { break }
         let trimmed = line.trimmingCharacters(in: .whitespaces)
         if trimmed.isEmpty { continue }

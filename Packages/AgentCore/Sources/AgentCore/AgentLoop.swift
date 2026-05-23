@@ -5,13 +5,15 @@ import Foundation
 public final class AgentLoop {
     public let cwd: URL
     private let engine: InferenceEngine
-    private let registry: ToolRegistry
+    private let tools: ToolRegistry
+    private let hooks: HookRegistry
     public var messages: [Message]
 
-    public init(cwd: URL, engine: InferenceEngine) {
+    public init(cwd: URL, engine: InferenceEngine, hooks: HookRegistry) {
         self.cwd = cwd
         self.engine = engine
-        self.registry = ToolRegistry([
+        self.hooks = hooks
+        self.tools = ToolRegistry([
             BashTool(cwd: cwd),
             ReadFileTool(cwd: cwd),
             WriteFileTool(cwd: cwd),
@@ -21,10 +23,12 @@ public final class AgentLoop {
         self.messages = [.system(SystemPrompt.make(cwd: cwd))]
     }
 
-    /// Mirrors the Python s02 `while True`: stream → on tool call, dispatch and loop;
-    /// on plain text completion, exit.
+    /// Mirrors the Python s04 `while True`: stream → on tool call, dispatch via
+    /// hook gates and loop; on plain-text completion, fire stop and return.
     public func send(_ userText: String) async {
-        messages.append(.user(userText))
+        let text = await hooks.triggerUserPrompt(userText)
+        messages.append(.user(text))
+
         while true {
             let snapshot = messages
             let assistantIdx = messages.count
@@ -33,7 +37,7 @@ public final class AgentLoop {
             var buffer = ""
             var pendingCall: AgentToolCall?
 
-            for await event in engine.stream(messages: snapshot, tools: registry.toolSpecs) {
+            for await event in engine.stream(messages: snapshot, tools: tools.toolSpecs) {
                 switch event {
                 case .text(let delta):
                     buffer += delta
@@ -43,14 +47,25 @@ public final class AgentLoop {
                 }
             }
 
-            guard let call = pendingCall else { return }
+            guard let call = pendingCall else {
+                await hooks.triggerStop()
+                return
+            }
 
-            let output = await registry.dispatch(name: call.name, arguments: call.arguments)
+            // Surface the pending call to the UI before any hook may suspend
+            // (e.g. permission asking the user), so the bubble can host the prompt.
             messages[assistantIdx].toolCall = call
+
+            let output: String
+            if let blockReason = await hooks.triggerPreTool(call) {
+                output = "Permission denied: \(blockReason)"
+            } else {
+                let raw = await tools.dispatch(name: call.name, arguments: call.arguments)
+                output = await hooks.triggerPostTool(call, output: raw)
+            }
             messages[assistantIdx].toolResult = output
-            // No separate `.tool(_)` message — the result is bundled into the
-            // assistant turn's content when we re-render for the next generation
-            // (see InferenceEngine.stream chat-mapping).
+            // The result is bundled into the assistant turn's content when we
+            // re-render for the next generation (see InferenceEngine.stream).
         }
     }
 }

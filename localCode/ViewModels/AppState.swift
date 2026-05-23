@@ -10,6 +10,11 @@ final class AppState {
     var input: String = ""
     var isStreaming = false
 
+    /// Set when the agent loop is suspended awaiting a tool-call approval.
+    /// Bound to a sheet in ChatView.
+    var pendingApproval: ApprovalRequest?
+    private var pendingChoice: CheckedContinuation<ApprovalChoice, Never>?
+
     var canSend: Bool {
         engine.state == .ready
             && !isStreaming
@@ -23,7 +28,16 @@ final class AppState {
 
     func pickDirectory(_ url: URL) {
         cwd = url
-        loop = AgentLoop(cwd: url, engine: engine)
+        let permission = Permission { [weak self] request in
+            await withCheckedContinuation { (cont: CheckedContinuation<ApprovalChoice, Never>) in
+                self?.pendingApproval = request
+                self?.pendingChoice = cont
+            }
+        }
+        let hooks = HookRegistry()
+        hooks.register(preTool: BuiltinHooks.permission(permission))
+        hooks.register(postTool: BuiltinHooks.truncateLargeOutput())
+        loop = AgentLoop(cwd: url, engine: engine, hooks: hooks)
     }
 
     func send() async {
@@ -33,6 +47,14 @@ final class AppState {
         isStreaming = true
         await loop.send(text)
         isStreaming = false
+    }
+
+    /// Called by ApprovalSheet when the user picks a choice.
+    func resolveApproval(_ choice: ApprovalChoice) {
+        let cont = pendingChoice
+        pendingApproval = nil
+        pendingChoice = nil
+        cont?.resume(returning: choice)
     }
 
     /// Format the full chat (including hidden tool_result messages) for debugging.

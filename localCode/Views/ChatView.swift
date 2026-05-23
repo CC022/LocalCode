@@ -7,32 +7,32 @@ struct ChatView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            StatusBar()
-            Divider()
             messagesScroll
             Divider()
             InputBar()
+            Divider()
+            StatusBar()
         }
     }
 
     private var messagesScroll: some View {
-        ScrollViewReader { proxy in
-            ScrollView {
-                LazyVStack(alignment: .leading, spacing: 12) {
-                    if let loop = app.loop {
-                        ForEach(loop.messages.filter { !$0.isHiddenInUI }) { msg in
-                            MessageBubble(message: msg).id(msg.id)
-                        }
+        ScrollView {
+            LazyVStack(alignment: .leading, spacing: 12) {
+                if let loop = app.loop {
+                    ForEach(loop.messages.filter { !$0.isHiddenInUI }) { msg in
+                        MessageBubble(message: msg).id(msg.id)
                     }
                 }
-                .padding()
             }
-            .onChange(of: app.loop?.messages.count ?? 0) {
-                if let last = app.loop?.messages.last(where: { !$0.isHiddenInUI }) {
-                    withAnimation { proxy.scrollTo(last.id, anchor: .bottom) }
-                }
-            }
+            .padding()
+            // Push the stack to the bottom so the first message starts there
+            // rather than the top, before any anchor work.
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
         }
+        // Pin the scroll position to the bottom: initial view shows the latest
+        // message and the view auto-follows as content grows (e.g., during
+        // streaming or when a new bubble is appended).
+        .defaultScrollAnchor(.bottom)
     }
 }
 
@@ -66,16 +66,16 @@ private struct StatusBar: View {
             HStack(spacing: 6) {
                 Text("Ready")
                 Text("·").foregroundStyle(.tertiary)
-                Text(app.engine.modelName).foregroundStyle(.secondary)
+                Text(app.engine.modelName)
                 Text("·").foregroundStyle(.tertiary)
                 ProgressView(value: contextFraction)
                     .progressViewStyle(.circular)
                     .controlSize(.mini)
                 Text("\(formatTokens(app.engine.tokenCount))/\(formatTokens(app.engine.contextWindow))")
-                    .foregroundStyle(.secondary)
                     .font(.system(.callout, design: .monospaced))
             }
             .font(.callout)
+            .foregroundStyle(.secondary)
         default:
             Text(statusString)
                 .font(.callout)
@@ -154,7 +154,7 @@ private struct StatusBar: View {
     @ViewBuilder private var statusIcon: some View {
         switch app.engine.state {
         case .ready:
-            Image(systemName: "circle.fill").foregroundStyle(.green).font(.caption2)
+            EmptyView()
         case .loading:
             ProgressView().controlSize(.small)
         case .failed:

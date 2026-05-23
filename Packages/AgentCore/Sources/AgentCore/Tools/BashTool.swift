@@ -16,16 +16,13 @@ struct BashTool: Tool {
         )
     }
 
-    private static let blocked = ["rm -rf /", "sudo ", "shutdown", "reboot", "> /dev/"]
     private static let maxOutput = 50_000
     private static let timeoutSeconds = 120
 
+    // Deny list / destructive-command checks live in `Permission` now.
     nonisolated func run(_ arguments: [String: JSONValue]) async -> String {
         guard let command = arguments["command"]?.string else {
             return "Error: missing 'command'"
-        }
-        if Self.blocked.contains(where: command.contains) {
-            return "Error: Dangerous command blocked"
         }
         let cwd = self.cwd
         return await Task.detached(priority: .userInitiated) {
