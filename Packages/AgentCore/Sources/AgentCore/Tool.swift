@@ -19,6 +19,8 @@ extension JSONValue {
         default:             nil
         }
     }
+    nonisolated var array: [JSONValue]? { if case .array(let v) = self { v } else { nil } }
+    nonisolated var object: [String: JSONValue]? { if case .object(let v) = self { v } else { nil } }
 }
 
 enum ToolSpecBuilder {

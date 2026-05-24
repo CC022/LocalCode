@@ -1,6 +1,20 @@
 import AgentCore
 import Foundation
 
+// Disable stdout buffering so progress streams to logs/pipes line-by-line.
+// Without this, `print` writes are held in an 8KB buffer when stdout is a
+// pipe, which makes the CLI look frozen during debug runs.
+setbuf(stdout, nil)
+
+/// Tiny reference box for sharing a Bool across the polling printer and the
+/// `Task { … }` that runs `loop.send`. Both run on the main actor, so plain
+/// reference semantics are enough.
+@MainActor
+final class MutableBox<T> {
+    var value: T
+    init(_ value: T) { self.value = value }
+}
+
 func stderr(_ s: String) {
     FileHandle.standardError.write(Data(s.utf8))
 }
@@ -74,9 +88,27 @@ func run() async {
         if trimmed == "exit" || trimmed == "quit" || trimmed == "q" { break }
 
         let before = loop.messages.count
-        await loop.send(trimmed)
-        let after = loop.messages.count
-        printNewMessages(loop: loop, from: before, to: after)
+        // Live-print new messages as the agent runs. Without this the CLI
+        // looks frozen during multi-turn tool sessions.
+        let isDone = MutableBox(false)
+        let sendTask = Task {
+            await loop.send(trimmed)
+            isDone.value = true
+        }
+        var printed = before
+        while !isDone.value {
+            try? await Task.sleep(for: .milliseconds(100))
+            let count = loop.messages.count
+            if count > printed {
+                printNewMessages(loop: loop, from: printed, to: count)
+                printed = count
+            }
+        }
+        await sendTask.value
+        let final = loop.messages.count
+        if final > printed {
+            printNewMessages(loop: loop, from: printed, to: final)
+        }
     }
 }
 

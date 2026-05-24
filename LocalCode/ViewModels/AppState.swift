@@ -4,6 +4,11 @@ import Foundation
 @Observable
 @MainActor
 final class AppState {
+    /// UserDefaults key for the last-picked working directory. Read by
+    /// `LocalCodeApp` at launch to restore the session; written here on every
+    /// pick so the value stays in sync (e.g. `@AppStorage` observers update).
+    static let workingDirKey = "workingDirPath"
+
     let engine = InferenceEngine()
     var loop: AgentLoop?
     var cwd: URL?
@@ -14,6 +19,10 @@ final class AppState {
     /// Bound to a sheet in ChatView.
     var pendingApproval: ApprovalRequest?
     private var pendingChoice: CheckedContinuation<ApprovalChoice, Never>?
+
+    /// Toggled by the status-bar button. Drives the right inspector.
+    var showTasks = true
+    private var currentSend: Task<Void, Never>?
 
     var canSend: Bool {
         engine.state == .ready
@@ -28,6 +37,7 @@ final class AppState {
 
     func pickDirectory(_ url: URL) {
         cwd = url
+        UserDefaults.standard.set(url.path, forKey: Self.workingDirKey)
         let permission = Permission { [weak self] request in
             await withCheckedContinuation { (cont: CheckedContinuation<ApprovalChoice, Never>) in
                 self?.pendingApproval = request
@@ -45,8 +55,15 @@ final class AppState {
         let text = input.trimmingCharacters(in: .whitespacesAndNewlines)
         input = ""
         isStreaming = true
-        await loop.send(text)
+        let task = Task { await loop.send(text) }
+        currentSend = task
+        await task.value
+        currentSend = nil
         isStreaming = false
+    }
+
+    func stop() {
+        currentSend?.cancel()
     }
 
     /// Called by ApprovalSheet when the user picks a choice.

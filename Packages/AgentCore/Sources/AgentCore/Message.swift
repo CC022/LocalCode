@@ -32,6 +32,16 @@ public struct AgentToolCall: Equatable, Sendable {
             return "edit \(arguments["path"]?.string ?? "")"
         case "glob":
             return "glob \(arguments["pattern"]?.string ?? "")"
+        case "todo_write":
+            // `todos` is a JSON-encoded string (see TodoWriteTool for why).
+            let count: Int = {
+                guard let s = arguments["todos"]?.string,
+                      let data = s.data(using: .utf8),
+                      let arr = try? JSONSerialization.jsonObject(with: data) as? [Any]
+                else { return 0 }
+                return arr.count
+            }()
+            return "update todos (\(count))"
         default:
             return name
         }

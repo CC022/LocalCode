@@ -40,6 +40,8 @@ private struct MarkdownBlock: View {
             MarkdownList(items: Array(l.listItems), ordered: true, start: Int(l.startIndex))
         case let q as BlockQuote:
             BlockQuoteView(quote: q)
+        case let t as Markdown.Table:
+            MarkdownTable(table: t)
         case is ThematicBreak:
             Divider()
         default:
@@ -78,6 +80,71 @@ private struct MarkdownList: View {
                 }
             }
         }
+    }
+}
+
+private struct MarkdownTable: View {
+    let table: Markdown.Table
+
+    var body: some View {
+        // Pre-walk so the body doesn't depend on lazy AST traversal during diffing.
+        let alignments = Array(table.columnAlignments)
+        let header: [Markdown.Table.Cell] = Array(table.head.cells)
+        let rows: [[Markdown.Table.Cell]] = table.body.rows.map { Array($0.cells) }
+        let columnCount = max(header.count, rows.map(\.count).max() ?? 0)
+
+        VStack(alignment: .leading, spacing: 0) {
+            Grid(alignment: .topLeading, horizontalSpacing: 14, verticalSpacing: 6) {
+                if !header.isEmpty {
+                    GridRow {
+                        ForEach(0..<columnCount, id: \.self) { col in
+                            cellText(header[safe: col], align: alignments[safe: col] ?? nil)
+                                .font(.callout.weight(.semibold))
+                        }
+                    }
+                    Divider().gridCellColumns(columnCount)
+                }
+                ForEach(Array(rows.enumerated()), id: \.offset) { _, row in
+                    GridRow {
+                        ForEach(0..<columnCount, id: \.self) { col in
+                            cellText(row[safe: col], align: alignments[safe: col] ?? nil)
+                        }
+                    }
+                }
+            }
+            .padding(8)
+        }
+        .background(.quaternary.opacity(0.35), in: RoundedRectangle(cornerRadius: 6))
+    }
+
+    @ViewBuilder
+    private func cellText(_ cell: Markdown.Table.Cell?, align: Markdown.Table.ColumnAlignment?) -> some View {
+        let text = cell.map(inlineString) ?? AttributedString("")
+        Text(text)
+            .frame(maxWidth: .infinity, alignment: alignment(for: align))
+            .multilineTextAlignment(textAlignment(for: align))
+    }
+
+    private func alignment(for col: Markdown.Table.ColumnAlignment?) -> Alignment {
+        switch col {
+        case .center: .center
+        case .right:  .trailing
+        case .left, nil: .leading
+        }
+    }
+
+    private func textAlignment(for col: Markdown.Table.ColumnAlignment?) -> TextAlignment {
+        switch col {
+        case .center: .center
+        case .right:  .trailing
+        case .left, nil: .leading
+        }
+    }
+}
+
+private extension Array {
+    subscript(safe i: Int) -> Element? {
+        indices.contains(i) ? self[i] : nil
     }
 }
 

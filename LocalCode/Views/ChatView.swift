@@ -6,12 +6,16 @@ struct ChatView: View {
     @Environment(AppState.self) private var app
 
     var body: some View {
+        @Bindable var app = app
         VStack(spacing: 0) {
             messagesScroll
             Divider()
             InputBar()
             Divider()
             StatusBar()
+        }
+        .inspector(isPresented: $app.showTasks) {
+            TasksInspector()
         }
     }
 
@@ -47,6 +51,10 @@ struct ChatView: View {
                     proxy.scrollTo(Self.bottomID, anchor: .bottom)
                 }
             }
+            // Coding-agent aesthetic: monospaced everywhere in the chat.
+            // Cascades to MessageBubble / MarkdownView so headings, lists,
+            // and inline runs all inherit unless they set an explicit design.
+            .fontDesign(.monospaced)
         }
     }
 
@@ -122,6 +130,7 @@ private struct StatusBar: View {
                 }
             Spacer()
             copyButton
+            tasksToggle
             if let cwd = app.cwd {
                 Button {
                     changingDir = true
@@ -145,6 +154,17 @@ private struct StatusBar: View {
         ) { result in
             if case .success(let url) = result { app.pickDirectory(url) }
         }
+    }
+
+    private var tasksToggle: some View {
+        Button {
+            app.showTasks.toggle()
+        } label: {
+            Image(systemName: app.showTasks ? "sidebar.right" : "sidebar.squares.right")
+                .foregroundStyle(.secondary)
+        }
+        .buttonStyle(.plain)
+        .help(app.showTasks ? "Hide tasks" : "Show tasks")
     }
 
     private var copyButton: some View {

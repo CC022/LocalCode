@@ -4,7 +4,10 @@ import PackageDescription
 let package = Package(
     name: "AgentCore",
     platforms: [
-        .macOS(.v14),
+        // The only consumers are the LocalCode app and CLI, both pinned to
+        // macOS 26.5. Tracking .v15 keeps us aligned with modern stdlib
+        // features (e.g. `Synchronization.Mutex`).
+        .macOS(.v15),
     ],
     products: [
         .library(name: "AgentCore", targets: ["AgentCore"]),
