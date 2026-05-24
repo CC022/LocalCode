@@ -86,6 +86,16 @@ func run() async {
         let trimmed = line.trimmingCharacters(in: .whitespaces)
         if trimmed.isEmpty { continue }
         if trimmed == "exit" || trimmed == "quit" || trimmed == "q" { break }
+        if trimmed == "/clear" {
+            loop.clear()
+            stderr("[cleared]\n\n")
+            continue
+        }
+        if trimmed == "/compact" {
+            await loop.compact()
+            if let last = loop.messages.last { print("[COMPACTED]\n\(last.text)\n") }
+            continue
+        }
 
         let before = loop.messages.count
         // Live-print new messages as the agent runs. Without this the CLI

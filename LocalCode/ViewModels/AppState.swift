@@ -54,6 +54,26 @@ final class AppState {
         guard let loop, canSend else { return }
         let text = input.trimmingCharacters(in: .whitespacesAndNewlines)
         input = ""
+
+        // Slash commands are meta-actions on the chat, not turns for the model.
+        // Handled here so they don't reach `AgentLoop.send` and don't appear in
+        // the transcript as user messages.
+        switch text {
+        case "/clear":
+            loop.clear()
+            return
+        case "/compact":
+            isStreaming = true
+            let task = Task { await loop.compact() }
+            currentSend = task
+            await task.value
+            currentSend = nil
+            isStreaming = false
+            return
+        default:
+            break
+        }
+
         isStreaming = true
         let task = Task { await loop.send(text) }
         currentSend = task

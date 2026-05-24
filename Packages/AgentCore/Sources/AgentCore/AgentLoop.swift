@@ -107,4 +107,78 @@ public final class AgentLoop {
             // re-render for the next generation (see InferenceEngine.stream).
         }
     }
+
+    /// Wipe the chat back to just the system prompt and discard the KV cache.
+    /// Triggered by the `/clear` slash command.
+    public func clear() {
+        messages = [.system(SystemPrompt.make(cwd: cwd))]
+        todos = []
+        roundsSinceTodo = 0
+        cacheSlot.reset()
+    }
+
+    /// Summarize the current chat into a single seed message. Runs one
+    /// tool-less generation against a *separate* (nil) cache so the persistent
+    /// KV — which still matches the pre-compact prompt — isn't polluted, then
+    /// replaces `messages` with `[system, summary]` and resets the slot so the
+    /// next turn rebuilds prefill against the now-tiny prompt.
+    public func compact() async {
+        guard messages.count > 1 else { return }   // nothing past the system prompt
+
+        let transcript = renderTranscript()
+        let prompt = """
+        Summarize this coding-agent conversation so work can continue. Preserve: \
+        1) the current goal, 2) key findings and decisions, 3) files read or \
+        changed, 4) remaining work, 5) user constraints. Be compact but concrete.
+
+        \(transcript)
+        """
+
+        let placeholderIdx = messages.count
+        messages.append(.assistant("Compacting conversation…"))
+
+        var summary = ""
+        for await event in engine.stream(
+            messages: [.user(prompt)],
+            tools: [],
+            cacheSlot: nil
+        ) {
+            if case .text(let delta) = event {
+                summary += delta
+                messages[placeholderIdx].text = "Compacting conversation…\n\n\(summary)"
+            }
+        }
+
+        let trimmed = summary.trimmingCharacters(in: .whitespacesAndNewlines)
+        let finalSummary = trimmed.isEmpty ? "(empty summary)" : trimmed
+        messages = [
+            .system(SystemPrompt.make(cwd: cwd)),
+            .user("[Previous conversation summary]\n\n\(finalSummary)")
+        ]
+        roundsSinceTodo = 0
+        cacheSlot.reset()
+    }
+
+    /// Flatten the visible chat into a single string for the summarizer.
+    private func renderTranscript() -> String {
+        messages.dropFirst().map { msg in
+            let role: String = switch msg.role {
+            case .system:    "SYSTEM"
+            case .user:      "USER"
+            case .assistant: "ASSISTANT"
+            case .tool:      "TOOL"
+            }
+            var out = "[\(role)]\n\(msg.text)"
+            if let call = msg.toolCall {
+                out += "\n[tool_call] \(call.summary)"
+            }
+            if let result = msg.toolResult {
+                let clipped = result.count > 2000
+                    ? String(result.prefix(2000)) + "\n…(truncated)"
+                    : result
+                out += "\n[tool_result]\n\(clipped)"
+            }
+            return out
+        }.joined(separator: "\n\n")
+    }
 }
