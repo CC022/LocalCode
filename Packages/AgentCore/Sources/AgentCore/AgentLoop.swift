@@ -33,6 +33,7 @@ public final class AgentLoop {
             TodoWriteTool(onUpdate: { [weak self] items in
                 self?.todos = items
             }),
+            LoadSkillTool(),
         ])
     }
 
