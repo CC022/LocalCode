@@ -30,7 +30,15 @@ public final class InferenceEngine {
         case failed(String)
     }
 
+    public enum InferencePhase: String, Equatable {
+        case idle
+        case prepare
+        case prefill
+        case decode
+    }
+
     public var state: LoadState = .idle
+    public var inferencePhase: InferencePhase = .idle
     public var tokenCount: Int = 0
     public var contextWindow: Int = 0
     private var container: ModelContainer?
@@ -114,50 +122,107 @@ public final class InferenceEngine {
                 }
                 let params = GenerateParameters(maxTokens: 4096, temperature: 0.7)
                 do {
+                    await MainActor.run { self.inferencePhase = .prepare }
                     let lmInput = try await container.prepare(
                         input: UserInput(chat: chat, tools: tools.isEmpty ? nil : tools)
                     )
-                    let prompt = lmInput.text.tokens.size
-                    await MainActor.run { self.tokenCount = prompt }
+                    let promptTokens = lmInput.text.tokens.asArray(Int.self)
+                    let promptCount = promptTokens.count
+                    await MainActor.run { self.tokenCount = promptCount }
+
+                    // Trim the input to just the tokens beyond what the cache
+                    // already holds. The cache covers `skip` tokens (last
+                    // turn's prompt + sampled output); the new prompt's first
+                    // `skip` tokens are required to match what's cached, so
+                    // re-feeding them would just duplicate work and corrupt
+                    // positions. If the slot reports a mismatch we reset it
+                    // and fall back to a fresh full prefill.
+                    //
+                    // Skip the cache path entirely when an image/video is in
+                    // play — Gemma 4's image embedding tokens don't map
+                    // cleanly to a 1:1 token slice, and this agent doesn't
+                    // use images.
+                    let canSlice = lmInput.image == nil && lmInput.video == nil
+                    var skip = 0
+                    if let slot = cacheSlot {
+                        if canSlice, let s = slot.prefixSkip(against: promptTokens) {
+                            skip = s
+                        } else {
+                            slot.reset()
+                        }
+                    }
+
+                    let sliced: LMInput
+                    if skip > 0 {
+                        sliced = LMInput(
+                            text: lmInput.text[0..., skip...],
+                            image: lmInput.image,
+                            video: lmInput.video
+                        )
+                    } else {
+                        sliced = lmInput
+                    }
 
                     // Drop into the container's serial lock to allocate the cache
                     // (needs the model) and kick off the cache-aware generate.
                     // The returned AsyncStream is sendable and is iterated outside
                     // the lock.
-                    let inputBox = TransferBox(lmInput)
+                    await MainActor.run { self.inferencePhase = .prefill }
+                    let inputBox = TransferBox(sliced)
                     let toolsForCall: [ToolSpec]? = tools.isEmpty ? nil : tools
-                    let stream: AsyncStream<Generation> = try await container.perform { context in
-                        // `makePromptCache` is mlx-swift-lm's documented entry
-                        // point — it defers to the model's own `newCache` so
-                        // we get the right per-layer cache mix (e.g. Gemma 4
-                        // uses RotatingKVCache for local-attention layers and
-                        // KVCacheSimple for global ones).
-                        let cache: [KVCache]? = cacheSlot.map { slot in
-                            slot.getOrAllocate {
-                                makePromptCache(model: context.model, parameters: params)
+                    let (stream, cacheRef): (AsyncStream<Generation>, [KVCache]?) =
+                        try await container.perform { context in
+                            // `makePromptCache` is mlx-swift-lm's documented entry
+                            // point — it defers to the model's own `newCache` so
+                            // we get the right per-layer cache mix (e.g. Gemma 4
+                            // uses RotatingKVCache for local-attention layers and
+                            // KVCacheSimple for global ones).
+                            let cache: [KVCache]? = cacheSlot.map { slot in
+                                slot.getOrAllocate {
+                                    makePromptCache(model: context.model, parameters: params)
+                                }
                             }
+                            let s = try MLXLMCommon.generate(
+                                input: inputBox.consume(),
+                                cache: cache,
+                                parameters: params,
+                                context: context,
+                                tools: toolsForCall
+                            )
+                            return (s, cache)
                         }
-                        return try MLXLMCommon.generate(
-                            input: inputBox.consume(),
-                            cache: cache,
-                            parameters: params,
-                            context: context,
-                            tools: toolsForCall
-                        )
-                    }
 
+                    await MainActor.run { self.inferencePhase = .decode }
+                    var brokeOnToolCall = false
                     for await gen in stream {
                         if Task.isCancelled { break }
                         if let chunk = gen.chunk {
                             continuation.yield(.text(chunk))
                         } else if let tc = gen.toolCall {
                             continuation.yield(.toolCall(tc))
+                            brokeOnToolCall = true
                             break  // stop generation after first tool call
                         }
+                    }
+
+                    // Record what the cache now holds so the next call can
+                    // skip the matching head — but only when the stream
+                    // completed naturally. Breaking on a tool call leaves
+                    // the cache in an indeterminate state (the underlying
+                    // generate Task may absorb a token or two after we
+                    // return), and on cancellation we also can't trust the
+                    // tail, so we reset in both cases. The next turn will
+                    // re-prefill from scratch.
+                    if Task.isCancelled || brokeOnToolCall {
+                        cacheSlot?.reset()
+                    } else if canSlice, let slot = cacheSlot, let cache = cacheRef {
+                        let postOffset = cache.first?.offset ?? 0
+                        slot.record(lastPrompt: promptTokens, cachedLength: postOffset)
                     }
                 } catch {
                     continuation.yield(.text("\n[error: \(error.localizedDescription)]"))
                 }
+                await MainActor.run { self.inferencePhase = .idle }
                 continuation.finish()
             }
             continuation.onTermination = { _ in task.cancel() }

@@ -73,7 +73,10 @@ private struct StatusBar: View {
         case .ready:
             let used = formatTokens(app.engine.tokenCount)
             let total = formatTokens(app.engine.contextWindow)
-            return "Ready · \(app.engine.modelName) · \(used)/\(total)"
+            let phase = app.engine.inferencePhase == .idle
+                ? ""
+                : " · \(app.engine.inferencePhase.rawValue)"
+            return "Ready · \(app.engine.modelName)\(phase) · \(used)/\(total)"
         case .failed(let m):  return m
         }
     }
@@ -92,12 +95,17 @@ private struct StatusBar: View {
                 Text("Ready")
                 Text("·").foregroundStyle(.tertiary)
                 Text(app.engine.modelName)
+                if app.engine.inferencePhase != .idle {
+                    Text("·").foregroundStyle(.tertiary)
+                    Text(app.engine.inferencePhase.rawValue)
+                        .font(.system(.callout, design: .monospaced))
+                }
                 Text("·").foregroundStyle(.tertiary)
+                Text("\(formatTokens(app.engine.tokenCount))/\(formatTokens(app.engine.contextWindow))")
+                    .font(.system(.callout, design: .monospaced))
                 ProgressView(value: contextFraction)
                     .progressViewStyle(.circular)
                     .controlSize(.mini)
-                Text("\(formatTokens(app.engine.tokenCount))/\(formatTokens(app.engine.contextWindow))")
-                    .font(.system(.callout, design: .monospaced))
             }
             .font(.callout)
             .foregroundStyle(.secondary)
