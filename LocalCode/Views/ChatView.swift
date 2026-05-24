@@ -69,6 +69,8 @@ private struct StatusBar: View {
     private var statusString: String {
         switch app.engine.state {
         case .idle:           return "Idle"
+        case .missing:        return "Model not downloaded"
+        case .downloading:    return "Downloading model \(Int(app.engine.downloadProgress * 100))%"
         case .loading:        return "Loading model…"
         case .ready:
             let used = formatTokens(app.engine.tokenCount)
@@ -109,6 +111,19 @@ private struct StatusBar: View {
             }
             .font(.callout)
             .foregroundStyle(.secondary)
+        case .downloading:
+            HStack(spacing: 6) {
+                Text("Downloading model")
+                ProgressView(value: app.engine.downloadProgress)
+                    .frame(width: 120)
+                Text("\(Int(app.engine.downloadProgress * 100))%")
+                    .font(.system(.callout, design: .monospaced))
+            }
+            .font(.callout)
+            .foregroundStyle(.secondary)
+        case .missing:
+            Button("Download Model") { app.downloadModel() }
+                .buttonStyle(.link)
         default:
             Text(statusString)
                 .font(.callout)
@@ -200,8 +215,10 @@ private struct StatusBar: View {
         switch app.engine.state {
         case .ready:
             EmptyView()
-        case .loading:
+        case .loading, .downloading:
             ProgressView().controlSize(.small)
+        case .missing:
+            Image(systemName: "arrow.down.circle").foregroundStyle(.secondary)
         case .failed:
             Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.red)
         case .idle:
@@ -212,6 +229,7 @@ private struct StatusBar: View {
     private var textColor: Color {
         switch app.engine.state {
         case .failed: .red
+        case .missing: .secondary
         case .idle:   .secondary
         default:      .primary
         }

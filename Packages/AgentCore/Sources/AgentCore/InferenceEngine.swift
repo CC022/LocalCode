@@ -25,6 +25,8 @@ private final class TransferBox<T>: @unchecked Sendable {
 public final class InferenceEngine {
     public enum LoadState: Equatable {
         case idle
+        case missing
+        case downloading
         case loading
         case ready
         case failed(String)
@@ -41,32 +43,43 @@ public final class InferenceEngine {
     public var inferencePhase: InferencePhase = .idle
     public var tokenCount: Int = 0
     public var contextWindow: Int = 0
+    public var downloadProgress: Double = 0
     private var container: ModelContainer?
+    private let modelDirectory: URL
 
-    public init() {}
+    nonisolated public static let modelRepository = "mlx-community/gemma-4-26b-a4b-it-4bit"
+    nonisolated public static let modelDirectoryName = "gemma-4-26b-a4b-it-4bit"
 
-    /// Resolves to <repo>/models/gemma-4-26b-a4b-it-4bit at compile time.
-    /// Walks up from `Packages/AgentCore/Sources/AgentCore/InferenceEngine.swift`
-    /// (5 levels) to the repo root, then appends `models/...`.
-    private static var modelDirectory: URL {
-        URL(fileURLWithPath: #filePath)
-            .deletingLastPathComponent()  // AgentCore/ (folder)
-            .deletingLastPathComponent()  // Sources/
-            .deletingLastPathComponent()  // AgentCore/ (package)
-            .deletingLastPathComponent()  // Packages/
-            .deletingLastPathComponent()  // repo root
-            .appendingPathComponent("models/gemma-4-26b-a4b-it-4bit")
+    public init(modelDirectory: URL? = nil) {
+        self.modelDirectory = modelDirectory ?? Self.defaultModelDirectory
     }
 
-    public var modelName: String { Self.modelDirectory.lastPathComponent }
+    nonisolated public static var defaultModelDirectory: URL {
+        FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("LocalCode", isDirectory: true)
+            .appendingPathComponent("Models", isDirectory: true)
+            .appendingPathComponent(modelDirectoryName, isDirectory: true)
+    }
+
+    public var modelName: String { modelDirectory.lastPathComponent }
+    public var modelPath: URL { modelDirectory }
+    public var modelFilesAvailable: Bool { Self.hasUsableModelFiles(at: modelDirectory) }
+
+    public func markModelMissing() {
+        state = .missing
+    }
 
     public func load() async {
         guard state != .ready, state != .loading else { return }
+        guard modelFilesAvailable else {
+            state = .missing
+            return
+        }
         state = .loading
-        contextWindow = Self.readContextWindow() ?? 8192
+        contextWindow = Self.readContextWindow(at: modelDirectory) ?? 8192
         do {
             container = try await VLMModelFactory.shared.loadContainer(
-                from: Self.modelDirectory,
+                from: modelDirectory,
                 using: #huggingFaceTokenizerLoader()
             )
             state = .ready
@@ -75,14 +88,61 @@ public final class InferenceEngine {
         }
     }
 
+    public func downloadAndLoad() async {
+        guard state != .ready, state != .loading, state != .downloading else { return }
+        guard let repo = HuggingFace.Repo.ID(rawValue: Self.modelRepository) else {
+            state = .failed("Invalid Hugging Face repository: \(Self.modelRepository)")
+            return
+        }
+
+        state = .downloading
+        downloadProgress = 0
+        do {
+            let root = modelDirectory.deletingLastPathComponent().deletingLastPathComponent()
+            try FileManager.default.createDirectory(
+                at: modelDirectory, withIntermediateDirectories: true)
+            let cache = HuggingFace.HubCache(
+                cacheDirectory: root
+                    .appendingPathComponent(".cache", isDirectory: true)
+                    .appendingPathComponent("huggingface", isDirectory: true)
+                    .appendingPathComponent("hub", isDirectory: true)
+            )
+            let client = HuggingFace.HubClient(cache: cache)
+            try await client.downloadSnapshot(
+                of: repo,
+                to: modelDirectory,
+                progressHandler: { [weak self] progress in
+                    self?.downloadProgress = progress.fractionCompleted
+                }
+            )
+            await load()
+        } catch {
+            state = .failed("\(error)")
+        }
+    }
+
     /// Read `text_config.max_position_embeddings` (or the top-level field) from config.json.
-    private static func readContextWindow() -> Int? {
+    private static func readContextWindow(at modelDirectory: URL) -> Int? {
         guard let data = try? Data(contentsOf: modelDirectory.appendingPathComponent("config.json")),
               let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
         else { return nil }
         if let txt = root["text_config"] as? [String: Any],
            let n = txt["max_position_embeddings"] as? Int { return n }
         return root["max_position_embeddings"] as? Int
+    }
+
+    private static func hasUsableModelFiles(at directory: URL) -> Bool {
+        guard FileManager.default.fileExists(
+            atPath: directory.appendingPathComponent("config.json").path)
+        else { return false }
+        guard let files = FileManager.default.enumerator(
+            at: directory,
+            includingPropertiesForKeys: nil,
+            options: [.skipsHiddenFiles, .skipsPackageDescendants])
+        else { return false }
+        return files.contains {
+            ($0 as? URL)?.pathExtension == "safetensors"
+        }
     }
 
     /// Stream the next assistant turn. Yields text deltas and tool calls in

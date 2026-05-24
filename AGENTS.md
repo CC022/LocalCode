@@ -26,7 +26,7 @@ xcodebuild -project LocalCode.xcodeproj -scheme LocalCode \
 # Filter to just errors / final status (build output is verbose):
 xcodebuild ... build 2>&1 | grep -E "error:|FAILED|BUILD SUCCEEDED" | tail -10
 
-# Download the model (one-time, ~15.6 GB into <repo>/models/, gitignored)
+# Download the model manually (optional; the app also prompts on first launch)
 pip install -U huggingface_hub
 python3 scripts/download_model.py
 
@@ -105,11 +105,12 @@ The status bar in `ChatView` reads all of these.
 
 ### Model path resolution
 
-The model directory is resolved at **compile time** via `#filePath` walking up from `Packages/AgentCore/Sources/AgentCore/InferenceEngine.swift` to the repo root and appending `models/gemma-4-26b-a4b-it-4bit`. This works during Xcode development but would need replacement (env var, bundle resource, user picker) for a shipped binary.
+The model directory lives in the app's user Application Support space:
+`~/Library/Application Support/LocalCode/Models/gemma-4-26b-a4b-it-4bit`. `InferenceEngine` checks for `config.json` plus at least one `.safetensors` file there. If files are missing at app launch, `AppState` marks the engine `.missing` and the SwiftUI shell prompts the user to download `mlx-community/gemma-4-26b-a4b-it-4bit` through `HuggingFace.HubClient.downloadSnapshot(...)`.
 
 ### Background warm-up
 
-`AppState.init()` kicks off `Task { await engine.load() }` so the model starts loading the instant the app launches — by the time the user picks a folder, it's usually already `.ready`. `engine.load()` is idempotent on `.ready` / `.loading`.
+`AppState.init()` kicks off `Task { await engine.load() }` only when model files already exist, so the model starts loading the instant the app launches — by the time the user picks a folder, it's usually already `.ready`. If the files are absent, launch shows the download prompt instead. `engine.load()` is idempotent on `.ready` / `.loading`.
 
 ### Changing working directory
 

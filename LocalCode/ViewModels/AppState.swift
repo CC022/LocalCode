@@ -20,6 +20,8 @@ final class AppState {
     var pendingApproval: ApprovalRequest?
     private var pendingChoice: CheckedContinuation<ApprovalChoice, Never>?
 
+    var showModelDownloadPrompt = false
+
     /// Toggled by the status-bar button. Drives the right inspector.
     var showTasks = true
     private var currentSend: Task<Void, Never>?
@@ -31,8 +33,17 @@ final class AppState {
     }
 
     init() {
-        // Start warming the model immediately — don't wait for the user to pick a folder.
-        Task { await engine.load() }
+        if engine.modelFilesAvailable {
+            // Start warming the model immediately — don't wait for the user to pick a folder.
+            Task { await engine.load() }
+        } else {
+            engine.markModelMissing()
+            showModelDownloadPrompt = true
+        }
+    }
+
+    func downloadModel() {
+        Task { await engine.downloadAndLoad() }
     }
 
     func pickDirectory(_ url: URL) {

@@ -35,6 +35,22 @@ struct DirectoryPicker: View {
     @ViewBuilder
     private var modelStatus: some View {
         switch app.engine.state {
+        case .missing:
+            VStack(spacing: 8) {
+                Text("Model not downloaded")
+                Button("Download Model") { app.downloadModel() }
+                    .buttonStyle(.bordered)
+            }
+            .font(.callout)
+            .foregroundStyle(.secondary)
+        case .downloading:
+            VStack(spacing: 8) {
+                ProgressView(value: app.engine.downloadProgress)
+                    .frame(width: 220)
+                Text("Downloading model \(Int(app.engine.downloadProgress * 100))%")
+            }
+            .font(.callout)
+            .foregroundStyle(.secondary)
         case .idle, .loading:
             HStack(spacing: 6) {
                 ProgressView().controlSize(.small)
