@@ -10,6 +10,10 @@ The Swift app is being built as a **step-by-step port of the Python tutorial in 
 
 The active model is **`mlx-community/gemma-4-26b-a4b-it-4bit`** (Gemma 4 26B MoE, ~4B active, 4-bit quant, ~15.6 GB on disk, 262144-token context).
 
+## Coding style
+
+Always use modern, concise Swift. If a feature can be implemented with fewer lines of code, prefer the shorter version.
+
 ## Build & run
 
 ```bash
