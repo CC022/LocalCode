@@ -22,14 +22,15 @@ final class AppState {
 
     var showModelDownloadPrompt = false
 
-    /// Toggled by the status-bar button. Drives the right inspector.
+    /// Drives the right inspector visibility. Toggled by the toolbar's
+    /// built-in inspector button (auto-injected by `.inspector`).
     var showTasks = true
 
     /// When on, the chat view swaps the formatted bubbles for a raw transcript
     /// that shows every message (including system + tool) wrapped in the
     /// model's chat-template role markers, with serialized tool calls and
     /// results inline — i.e. as close as we can get to "what the model sees /
-    /// emits" without dropping to token IDs. Toggled from the status bar.
+    /// emits" without dropping to token IDs. Toggled from the inspector.
     var developerMode = false
     private var currentSend: Task<Void, Never>?
 

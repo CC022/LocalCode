@@ -20,7 +20,7 @@ struct TodoWriteTool: Tool {
     var toolSpec: ToolSpec {
         ToolSpecBuilder.make(
             name: name,
-            description: "Update the task list for the current session. Pass a JSON-encoded array of {content, status} objects where status is one of 'pending', 'in_progress', or 'completed'. Replaces the full list each call.",
+            description: "Maintain the visible task list for the current session. Each call REPLACES the full list, so every call must include EVERY task (planned, in-progress, completed) — not just the one that changed. On the first call for a multi-step task, emit ALL planned steps at once. On follow-up calls, re-emit the same items with updated statuses ('pending', 'in_progress', or 'completed'). Pass a JSON-encoded array of {content, status} objects.",
             properties: [
                 (name: "todos", type: "string",
                  description: #"JSON array of todo items, e.g. '[{"content":"read main.py","status":"pending"},{"content":"refactor","status":"in_progress"}]'"#),

@@ -53,6 +53,11 @@ public enum GemmaWireFormat {
                 if toolCall == nil {
                     toolCall = AgentToolCall(name: name, arguments: args)
                 }
+            case .partialToolCall(let name, let body):
+                let header = name.isEmpty
+                    ? "→ generating tool call…"
+                    : "→ generating tool call: \(name)"
+                textParts.append("\n\(header)\n\n\(body)")
             case .text(let s):
                 textParts.append(s)
             case .toolResponse:
@@ -101,6 +106,12 @@ public enum GemmaWireFormat {
         case text(String)
         case thought(String, closed: Bool)
         case toolCall(name: String, args: [String: JSONValue])
+        /// In-flight tool call: opener seen, closer hasn't arrived. `body` is
+        /// whatever has streamed in so far with our wire-format escape markers
+        /// stripped — surfaced into the assistant bubble so the user sees the
+        /// model is still working (otherwise long tool-call generations look
+        /// like silent stalls).
+        case partialToolCall(name: String, body: String)
         case toolResponse(name: String, output: String)
     }
 
@@ -124,8 +135,22 @@ public enum GemmaWireFormat {
             return .thought(b, closed: closed)
         },
         Wrapper(open: "<|tool_call>", close: "<tool_call|>") { body, closed in
-            guard closed, let parsed = parseCallBody(body) else { return nil }
-            return .toolCall(name: parsed.name, args: parsed.args)
+            if closed {
+                guard let parsed = parseCallBody(body) else { return nil }
+                return .toolCall(name: parsed.name, args: parsed.args)
+            }
+            // Streaming: extract name (if available yet) and show raw body
+            // minus the escape markers so the UI can preview what's flowing.
+            var s = Substring(body)
+            if s.hasPrefix("call:") { s = s.dropFirst("call:".count) }
+            let name: String = {
+                if let brace = s.firstIndex(of: "{") {
+                    return String(s[..<brace]).trimmingCharacters(in: .whitespaces)
+                }
+                return String(s).trimmingCharacters(in: .whitespaces)
+            }()
+            let preview = body.replacingOccurrences(of: escapeMarker, with: "")
+            return .partialToolCall(name: name, body: preview)
         },
         Wrapper(open: "<|tool_response>", close: "<tool_response|>") { body, closed in
             guard closed, let parsed = parseResponseBody(body) else { return nil }

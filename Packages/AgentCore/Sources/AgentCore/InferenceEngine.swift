@@ -180,6 +180,12 @@ public final class InferenceEngine {
                         return .assistant(content)
                     }
                 }
+                // With thinking disabled (see additionalContext below), each
+                // turn is action-only and fits comfortably in 4096 tokens —
+                // enough for a write_file body with a ~3K-token parser script
+                // or a 100-row CSV in a final summarization. Larger values
+                // OOM'd Metal on multi-fetch sessions; smaller values cut
+                // write_file bodies short.
                 let params = GenerateParameters(maxTokens: 4096, temperature: 0.7)
                 do {
                     await MainActor.run { self.inferencePhase = .prepare }
@@ -187,15 +193,14 @@ public final class InferenceEngine {
                         input: UserInput(
                             chat: chat,
                             tools: tools.isEmpty ? nil : tools,
-                            // Gemma 4's chat template gates its thinking
-                            // channel on this flag. When false/unset the
-                            // template injects an empty `<|channel>thought
-                            // <channel|>` block to suppress reasoning;
-                            // setting it true opens `<|think|>` in the
-                            // system turn and lets the model emit
-                            // `<|channel>thought…<channel|>` before each
-                            // response or tool call.
-                            additionalContext: ["enable_thinking": true]
+                            // Thinking disabled: every turn becomes
+                            // action-only. The model still plans via
+                            // todo_write but skips the 3-5K-token chain-of-
+                            // thought preamble that otherwise eats most of
+                            // the per-turn budget and balloons KV cache
+                            // memory across long sessions (verified OOM on
+                            // multi-fetch runs with thinking enabled).
+                            additionalContext: ["enable_thinking": false]
                         )
                     )
                     let promptTokens = lmInput.text.tokens.asArray(Int.self)

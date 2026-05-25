@@ -19,22 +19,42 @@ enum WebHTML {
         return (http?.statusCode ?? 0, http?.value(forHTTPHeaderField: "Content-Type"), body)
     }
 
-    /// HTML → readable text: drop script/style blocks, strip tags, decode the
-    /// handful of entities people actually hit, collapse whitespace.
+    /// HTML → readable text: drop script/style/nav/footer blocks, strip tags,
+    /// decode entities, trim each line, collapse runs of blank lines to one.
     static func strip(_ html: String) -> String {
         var s = html
-        for pattern in [#"<script\b[^>]*>[\s\S]*?</script>"#, #"<style\b[^>]*>[\s\S]*?</style>"#] {
+        let blockPatterns = [
+            #"<script\b[^>]*>[\s\S]*?</script>"#,
+            #"<style\b[^>]*>[\s\S]*?</style>"#,
+            #"<noscript\b[^>]*>[\s\S]*?</noscript>"#,
+            #"<nav\b[^>]*>[\s\S]*?</nav>"#,
+            #"<header\b[^>]*>[\s\S]*?</header>"#,
+            #"<footer\b[^>]*>[\s\S]*?</footer>"#,
+            #"<svg\b[^>]*>[\s\S]*?</svg>"#,
+            #"<!--[\s\S]*?-->"#,
+        ]
+        for pattern in blockPatterns {
             if let re = (try? Regex(pattern))?.ignoresCase() {
                 s.replace(re, with: " ")
             }
         }
         if let tag = try? Regex(#"<[^>]+>"#) {
-            s.replace(tag, with: " ")
+            s.replace(tag, with: "\n")
         }
         s = decodeEntities(s)
-        if let ws = try? Regex(#"[ \t\u{00A0}]+"#) { s.replace(ws, with: " ") }
-        if let nl = try? Regex(#"\n[ \t]*\n(\s*\n)+"#) { s.replace(nl, with: "\n\n") }
-        return s.trimmingCharacters(in: .whitespacesAndNewlines)
+        var out: [String] = []
+        var blanks = 0
+        for raw in s.split(separator: "\n", omittingEmptySubsequences: false) {
+            let line = raw.trimmingCharacters(in: .whitespaces)
+            if line.isEmpty {
+                blanks += 1
+                if blanks <= 1 { out.append("") }
+            } else {
+                blanks = 0
+                out.append(line)
+            }
+        }
+        return out.joined(separator: "\n").trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     private static let namedEntities: [String: String] = [
