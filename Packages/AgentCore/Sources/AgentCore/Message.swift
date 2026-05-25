@@ -34,6 +34,10 @@ public struct AgentToolCall: Equatable, Sendable {
             return "glob \(arguments["pattern"]?.string ?? "")"
         case "load_skill":
             return "load skill \(arguments["name"]?.string ?? "?")"
+        case "web_search":
+            return "search \"\(arguments["query"]?.string ?? "")\""
+        case "web_fetch":
+            return "fetch \(arguments["url"]?.string ?? "")"
         case "todo_write":
             // `todos` is a JSON-encoded string (see TodoWriteTool for why).
             let count: Int = {

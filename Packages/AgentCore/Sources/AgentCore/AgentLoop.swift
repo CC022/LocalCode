@@ -34,6 +34,8 @@ public final class AgentLoop {
                 self?.todos = items
             }),
             LoadSkillTool(),
+            WebSearchTool(),
+            WebFetchTool(),
         ])
     }
 
