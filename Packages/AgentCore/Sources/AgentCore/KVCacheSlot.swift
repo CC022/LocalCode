@@ -56,6 +56,14 @@ public final class KVCacheSlot: @unchecked Sendable {
         }
     }
 
+    /// Read the current `cache[0].offset` if the cache has been allocated.
+    /// Used to record `cachedLength` after generation completes without
+    /// having to smuggle the non-`Sendable` `[KVCache]?` array out of the
+    /// `container.perform` closure that allocated it.
+    public func currentOffset() -> Int? {
+        storage.withLock { state in state.cache?.first?.offset }
+    }
+
     /// Decide how many tokens at the head of `newPrompt` are already in the
     /// cache and can be skipped during prefill.
     ///

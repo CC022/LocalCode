@@ -6,15 +6,33 @@ struct MessageBubble: View {
     let message: Message
 
     var body: some View {
-        HStack(alignment: .top, spacing: 0) {
-            if message.role == .user { Spacer(minLength: 60) }
-            VStack(alignment: .leading, spacing: 8) {
-                content
+        VStack(alignment: .leading, spacing: 4) {
+            if let thinking = message.thinking, !thinking.isEmpty {
+                thoughtView(thinking)
             }
-            .padding(12)
-            .background(background, in: RoundedRectangle(cornerRadius: 12))
-            if message.role == .assistant { Spacer(minLength: 60) }
+            HStack(alignment: .top, spacing: 0) {
+                if message.role == .user { Spacer(minLength: 60) }
+                VStack(alignment: .leading, spacing: 8) {
+                    content
+                }
+                .padding(12)
+                .background(background, in: RoundedRectangle(cornerRadius: 12))
+                if message.role == .assistant { Spacer(minLength: 60) }
+            }
         }
+    }
+
+    /// Chain-of-thought from Gemma 4's `<|channel>thought` block. Rendered
+    /// as small, secondary, no-bubble text aligned with the assistant side
+    /// so it visually reads as "the model's notes" rather than a reply.
+    private func thoughtView(_ text: String) -> some View {
+        Text(text)
+            .font(.system(.caption, design: .monospaced))
+            .foregroundStyle(.secondary)
+            .textSelection(.enabled)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 12)
+            .padding(.trailing, 60)  // mirror the assistant-side inset
     }
 
     /// A pending approval is one whose call matches this bubble's toolCall

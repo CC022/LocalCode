@@ -184,7 +184,19 @@ public final class InferenceEngine {
                 do {
                     await MainActor.run { self.inferencePhase = .prepare }
                     let lmInput = try await container.prepare(
-                        input: UserInput(chat: chat, tools: tools.isEmpty ? nil : tools)
+                        input: UserInput(
+                            chat: chat,
+                            tools: tools.isEmpty ? nil : tools,
+                            // Gemma 4's chat template gates its thinking
+                            // channel on this flag. When false/unset the
+                            // template injects an empty `<|channel>thought
+                            // <channel|>` block to suppress reasoning;
+                            // setting it true opens `<|think|>` in the
+                            // system turn and lets the model emit
+                            // `<|channel>thought…<channel|>` before each
+                            // response or tool call.
+                            additionalContext: ["enable_thinking": true]
+                        )
                     )
                     let promptTokens = lmInput.text.tokens.asArray(Int.self)
                     let promptCount = promptTokens.count
@@ -230,35 +242,49 @@ public final class InferenceEngine {
                     await MainActor.run { self.inferencePhase = .prefill }
                     let inputBox = TransferBox(sliced)
                     let toolsForCall: [ToolSpec]? = tools.isEmpty ? nil : tools
-                    let (stream, cacheRef): (AsyncStream<Generation>, [KVCache]?) =
+                    let stream: AsyncStream<Generation> =
                         try await container.perform { context in
                             // `makePromptCache` is mlx-swift-lm's documented entry
                             // point — it defers to the model's own `newCache` so
                             // we get the right per-layer cache mix (e.g. Gemma 4
                             // uses RotatingKVCache for local-attention layers and
                             // KVCacheSimple for global ones).
+                            //
+                            // The cache lives in `cacheSlot`; we don't pass it
+                            // out of this closure (it isn't `Sendable`). After
+                            // streaming completes we read `cacheSlot.currentOffset()`.
                             let cache: [KVCache]? = cacheSlot.map { slot in
                                 slot.getOrAllocate {
                                     makePromptCache(model: context.model, parameters: params)
                                 }
                             }
-                            let s = try MLXLMCommon.generate(
+                            return try MLXLMCommon.generate(
                                 input: inputBox.consume(),
                                 cache: cache,
                                 parameters: params,
                                 context: context,
                                 tools: toolsForCall
                             )
-                            return (s, cache)
                         }
 
                     await MainActor.run { self.inferencePhase = .decode }
                     var brokeOnToolCall = false
+                    // Debug hook: set LOCALCODE_LOG_CHUNKS=1 to print the raw
+                    // chunk boundaries MLX delivers.
+                    let logChunks = ProcessInfo.processInfo.environment["LOCALCODE_LOG_CHUNKS"] == "1"
                     for await gen in stream {
                         if Task.isCancelled { break }
                         if let chunk = gen.chunk {
+                            if logChunks {
+                                FileHandle.standardError.write(
+                                    Data("[chunk] \(chunk.debugDescription)\n".utf8))
+                            }
                             continuation.yield(.text(chunk))
                         } else if let tc = gen.toolCall {
+                            if logChunks {
+                                FileHandle.standardError.write(
+                                    Data("[toolcall] \(tc.function.name)\n".utf8))
+                            }
                             continuation.yield(.toolCall(tc))
                             brokeOnToolCall = true
                             break  // stop generation after first tool call
@@ -275,8 +301,8 @@ public final class InferenceEngine {
                     // re-prefill from scratch.
                     if Task.isCancelled || brokeOnToolCall {
                         cacheSlot?.reset()
-                    } else if canSlice, let slot = cacheSlot, let cache = cacheRef {
-                        let postOffset = cache.first?.offset ?? 0
+                    } else if canSlice, let slot = cacheSlot,
+                              let postOffset = slot.currentOffset() {
                         slot.record(lastPrompt: promptTokens, cachedLength: postOffset)
                     }
                 } catch {

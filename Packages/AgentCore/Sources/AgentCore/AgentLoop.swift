@@ -68,7 +68,13 @@ public final class AgentLoop {
                 switch event {
                 case .text(let delta):
                     buffer += delta
-                    messages[assistantIdx].text = buffer
+                    // Strip thought channel + leaked tool-call markers from
+                    // the visible text on every chunk, and surface the
+                    // (possibly in-progress) thinking separately. This keeps
+                    // the bubble clean during streaming.
+                    let live = GemmaWireFormat.parse(buffer, includeOpenThinking: true)
+                    messages[assistantIdx].text = live.text
+                    messages[assistantIdx].thinking = live.thinking
                 case .toolCall(let mlxCall):
                     pendingCall = AgentToolCall(mlxCall)
                 }
@@ -79,12 +85,41 @@ public final class AgentLoop {
             // the partial assistant turn as stopped instead of treating it as
             // a natural completion.
             if Task.isCancelled {
-                let suffix = buffer.isEmpty ? "[stopped]" : "\n[stopped]"
-                messages[assistantIdx].text = buffer + suffix
+                let live = GemmaWireFormat.parse(buffer, includeOpenThinking: true)
+                let suffix = live.text.isEmpty ? "[stopped]" : "\n[stopped]"
+                messages[assistantIdx].text = live.text + suffix
+                messages[assistantIdx].thinking = live.thinking
                 return
             }
 
-            guard let call = pendingCall else {
+            // Final pass: surface the thought block (closed *or* unclosed —
+            // the model can hit maxTokens / EOS mid-thinking, and dropping the
+            // body in that case would erase the assistant turn the user just
+            // watched stream in) and recover a tool call whose `<|tool_call>`
+            // opener was swallowed by the detokenizer (Gemma 4 thinking mode
+            // reproducibly leaks the body into the chunk stream — see
+            // GemmaWireFormat.tokenize).
+            let parsed = GemmaWireFormat.parse(buffer, includeOpenThinking: true)
+            messages[assistantIdx].text = parsed.text
+            messages[assistantIdx].thinking = parsed.thinking
+            let effectiveCall = pendingCall ?? parsed.toolCall
+
+            guard let call = effectiveCall else {
+                // Cache-alignment guard: when the model emitted a
+                // `<|channel>thought` block but no tool call, the cache
+                // contains [prompt + thought + response] tokens. The next
+                // turn's prompt re-renders the assistant turn without the
+                // thought (Message.thinking is held off `text` and the
+                // chat template's `strip_thinking` macro would strip it
+                // anyway), so cached positions [prompt_len .. cachedLength)
+                // hold *thought* tokens while the new prompt at the same
+                // span holds *response* tokens. KVCacheSlot.prefixSkip
+                // only verifies the fed-prompt prefix, so it would slice
+                // the new prompt wrong and we'd generate with shifted RoPE
+                // and stale K/V. Reset so the next turn re-prefills cleanly.
+                if parsed.thinking != nil {
+                    cacheSlot.reset()
+                }
                 await hooks.triggerStop()
                 return
             }

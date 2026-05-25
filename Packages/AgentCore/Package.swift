@@ -40,5 +40,10 @@ let package = Package(
             ],
             path: "Sources/AgentCore",
             swiftSettings: [.swiftLanguageMode(.v5)]),
+        .testTarget(
+            name: "AgentCoreTests",
+            dependencies: ["AgentCore"],
+            path: "Tests/AgentCoreTests",
+            swiftSettings: [.swiftLanguageMode(.v5)]),
     ]
 )

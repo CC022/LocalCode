@@ -24,6 +24,13 @@ final class AppState {
 
     /// Toggled by the status-bar button. Drives the right inspector.
     var showTasks = true
+
+    /// When on, the chat view swaps the formatted bubbles for a raw transcript
+    /// that shows every message (including system + tool) wrapped in the
+    /// model's chat-template role markers, with serialized tool calls and
+    /// results inline — i.e. as close as we can get to "what the model sees /
+    /// emits" without dropping to token IDs. Toggled from the status bar.
+    var developerMode = false
     private var currentSend: Task<Void, Never>?
 
     var canSend: Bool {
@@ -106,6 +113,11 @@ final class AppState {
     }
 
     /// Format the full chat (including hidden tool_result messages) for debugging.
+    /// Each turn emits any thinking block, the assistant/user/system text, and
+    /// the tool call + tool result for assistant turns. Without these fields a
+    /// dumped transcript can look mysteriously blank — e.g. an assistant turn
+    /// that consisted purely of a `load_skill` tool call would render as an
+    /// empty `--- ASSISTANT ---` block, hiding the real model behavior.
     func exportTranscript() -> String {
         guard let loop else { return "(no chat yet)" }
         var out = "# LocalCode transcript\ncwd: \(loop.cwd.path)\n"
@@ -116,7 +128,22 @@ final class AppState {
             case .assistant: "ASSISTANT"
             case .tool:      "TOOL"
             }
-            out += "\n--- \(role) ---\n\(msg.text)\n"
+            out += "\n--- \(role) ---\n"
+            if let thinking = msg.thinking, !thinking.isEmpty {
+                out += "[thinking]\n\(thinking)\n"
+            }
+            if !msg.text.isEmpty {
+                out += "\(msg.text)\n"
+            }
+            if let call = msg.toolCall {
+                out += "[tool_call] \(call.summary)\n"
+                if let result = msg.toolResult {
+                    let clipped = result.count > 2000
+                        ? String(result.prefix(2000)) + "\n…(truncated)"
+                        : result
+                    out += "[tool_result]\n\(clipped)\n"
+                }
+            }
         }
         return out
     }

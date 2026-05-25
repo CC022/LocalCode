@@ -58,6 +58,11 @@ public struct Message: Identifiable, Equatable {
     public var text: String
     public var toolCall: AgentToolCall? = nil
     public var toolResult: String? = nil
+    /// Chain-of-thought content the model emitted inside
+    /// `<|channel>thought\n…<channel|>` (Gemma 4 thinking mode). Stripped out
+    /// of `text` so the bubble renders only the user-facing response, but
+    /// surfaced separately so the UI can show it as muted secondary text.
+    public var thinking: String? = nil
 
     public var isHiddenInUI: Bool { role == .system || role == .tool }
 

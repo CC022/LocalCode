@@ -31,27 +31,93 @@ func askApproval(_ request: ApprovalRequest) async -> ApprovalChoice {
     }
 }
 
+/// Coarse "which fields exist" sketch of an assistant message. We reprint
+/// when this changes — i.e. when a brand-new field appears — not on every
+/// chunk-level text growth, which would spam the log.
+struct FieldSketch: Equatable {
+    var hasText: Bool
+    var hasThinking: Bool
+    var hasToolCall: Bool
+    var hasToolResult: Bool
+}
+
 @MainActor
-func printNewMessages(loop: AgentLoop, from: Int, to: Int) {
-    for msg in loop.messages[from..<to] {
-        switch msg.role {
-        case .user:
-            print("[USER] \(msg.text)")
-        case .assistant:
-            if !msg.text.isEmpty {
-                print("[ASSISTANT] \(msg.text)")
+func sketch(_ m: Message) -> FieldSketch {
+    FieldSketch(
+        hasText: !m.text.isEmpty,
+        hasThinking: m.thinking?.isEmpty == false,
+        hasToolCall: m.toolCall != nil,
+        hasToolResult: m.toolResult?.isEmpty == false
+    )
+}
+
+@MainActor
+func render(_ m: Message) -> String {
+    switch m.role {
+    case .user:
+        return "[USER] \(m.text)"
+    case .assistant:
+        var parts: [String] = []
+        if let t = m.thinking, !t.isEmpty { parts.append("[THINKING] \(t)") }
+        if !m.text.isEmpty { parts.append("[ASSISTANT] \(m.text)") }
+        if let call = m.toolCall {
+            parts.append("[TOOL CALL] \(call.summary)")
+            if let r = m.toolResult {
+                let trimmed = r.count > 1000 ? String(r.prefix(1000)) + "\n…(truncated)" : r
+                parts.append("[TOOL RESULT]\n\(trimmed)")
             }
-            if let call = msg.toolCall {
-                print("[TOOL CALL] \(call.summary)")
-                if let r = msg.toolResult {
-                    let trimmed = r.count > 1000 ? String(r.prefix(1000)) + "\n…(truncated)" : r
-                    print("[TOOL RESULT]\n\(trimmed)")
-                }
+        }
+        return parts.isEmpty ? "[ASSISTANT] (empty)" : parts.joined(separator: "\n")
+    case .tool, .system:
+        return ""
+    }
+}
+
+/// Print any newly appended messages, plus reprint any assistant message
+/// when its `FieldSketch` changes — i.e. when a *new field* appears
+/// (thinking → text → toolCall → toolResult). Text growth within an
+/// already-printed field is not re-emitted; the final flush after the send
+/// task settles will catch the complete content.
+@MainActor
+func flushPrints(
+    loop: AgentLoop,
+    printedThrough: inout Int,
+    sketches: inout [Int: FieldSketch],
+    final: Bool = false
+) {
+    let total = loop.messages.count
+
+    while printedThrough < total {
+        let idx = printedThrough
+        let msg = loop.messages[idx]
+        // Skip rendering a completely empty assistant placeholder — wait for
+        // the first real field to appear.
+        if msg.role == .assistant && sketch(msg) == .init(
+            hasText: false, hasThinking: false, hasToolCall: false, hasToolResult: false
+        ) {
+            break
+        }
+        let r = render(msg)
+        if !r.isEmpty { print(r); print("") }
+        sketches[idx] = sketch(msg)
+        printedThrough += 1
+    }
+
+    for idx in 0..<printedThrough {
+        let msg = loop.messages[idx]
+        guard msg.role == .assistant else { continue }
+        let current = sketch(msg)
+        let last = sketches[idx]
+        if last != current || (final && last != nil) {
+            sketches[idx] = current
+            let r = render(msg)
+            if !r.isEmpty {
+                print("--- #\(idx) update ---")
+                print(r)
+                print("")
             }
-        case .tool, .system: break
         }
     }
-    print("")
 }
 
 @MainActor
@@ -79,6 +145,8 @@ func run() async {
     hooks.register(postTool: BuiltinHooks.truncateLargeOutput())
     hooks.register(stop: { stderr("[done]\n") })
     let loop = AgentLoop(cwd: cwd, engine: engine, hooks: hooks)
+    var printedThrough = 0
+    var sketches: [Int: FieldSketch] = [:]
 
     while true {
         stderr("> ")
@@ -88,6 +156,8 @@ func run() async {
         if trimmed == "exit" || trimmed == "quit" || trimmed == "q" { break }
         if trimmed == "/clear" {
             loop.clear()
+            printedThrough = loop.messages.count
+            sketches.removeAll()
             stderr("[cleared]\n\n")
             continue
         }
@@ -97,28 +167,19 @@ func run() async {
             continue
         }
 
-        let before = loop.messages.count
-        // Live-print new messages as the agent runs. Without this the CLI
-        // looks frozen during multi-turn tool sessions.
+        // Live-print new messages and reprint any whose state advances
+        // (toolCall populated, toolResult populated, thinking emerged, etc.).
         let isDone = MutableBox(false)
         let sendTask = Task {
             await loop.send(trimmed)
             isDone.value = true
         }
-        var printed = before
         while !isDone.value {
-            try? await Task.sleep(for: .milliseconds(100))
-            let count = loop.messages.count
-            if count > printed {
-                printNewMessages(loop: loop, from: printed, to: count)
-                printed = count
-            }
+            try? await Task.sleep(for: .milliseconds(150))
+            flushPrints(loop: loop, printedThrough: &printedThrough, sketches: &sketches)
         }
         await sendTask.value
-        let final = loop.messages.count
-        if final > printed {
-            printNewMessages(loop: loop, from: printed, to: final)
-        }
+        flushPrints(loop: loop, printedThrough: &printedThrough, sketches: &sketches, final: true)
     }
 }
 

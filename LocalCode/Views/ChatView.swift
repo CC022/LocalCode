@@ -8,12 +8,21 @@ struct ChatView: View {
     var body: some View {
         @Bindable var app = app
         VStack(spacing: 0) {
-            messagesScroll
+            if app.developerMode, let loop = app.loop {
+                RawTranscriptView(messages: loop.messages)
+            } else {
+                messagesScroll
+            }
             Divider()
             InputBar()
             Divider()
             StatusBar()
         }
+        // Empty toolbar + hidden background suppress the 1px separator macOS
+        // draws between the window's title bar and the content area. Without
+        // this, the line is visible across the top of the message window.
+        .toolbar { }
+        .toolbarBackground(.hidden, for: .windowToolbar)
         .inspector(isPresented: $app.showTasks) {
             TasksInspector()
         }
@@ -153,6 +162,7 @@ private struct StatusBar: View {
                 }
             Spacer()
             copyButton
+            developerToggle
             tasksToggle
             if let cwd = app.cwd {
                 Button {
@@ -177,6 +187,19 @@ private struct StatusBar: View {
         ) { result in
             if case .success(let url) = result { app.pickDirectory(url) }
         }
+    }
+
+    private var developerToggle: some View {
+        Button {
+            app.developerMode.toggle()
+        } label: {
+            Image(systemName: "curlybraces")
+                .foregroundStyle(app.developerMode ? Color.accentColor : .secondary)
+        }
+        .buttonStyle(.plain)
+        .help(app.developerMode
+              ? "Hide raw model I/O (developer mode)"
+              : "Show raw model I/O (developer mode)")
     }
 
     private var tasksToggle: some View {
