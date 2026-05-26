@@ -38,6 +38,12 @@ public struct AgentToolCall: Equatable, Sendable {
             return "search \"\(arguments["query"]?.string ?? "")\""
         case "web_fetch":
             return "fetch \(arguments["url"]?.string ?? "")"
+        case "parse_pdf":
+            let p = arguments["path"]?.string ?? ""
+            if let pages = arguments["pages"]?.string, !pages.isEmpty {
+                return "parse PDF \(p) (pages \(pages))"
+            }
+            return "parse PDF \(p)"
         case "todo_write":
             // `todos` is a JSON-encoded string (see TodoWriteTool for why).
             let count: Int = {

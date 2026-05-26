@@ -36,6 +36,7 @@ public final class AgentLoop {
             LoadSkillTool(),
             WebSearchTool(),
             WebFetchTool(),
+            ParsePDFTool(cwd: cwd),
         ])
     }
 
