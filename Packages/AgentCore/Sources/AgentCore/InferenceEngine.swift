@@ -44,6 +44,12 @@ public final class InferenceEngine {
     public var tokenCount: Int = 0
     public var contextWindow: Int = 0
     public var downloadProgress: Double = 0
+    /// User-controlled chain-of-thought switch. Default off because, on this
+    /// machine, thinking burns 3-5K tokens per turn and either truncates
+    /// tool-call bodies at `maxTokens=4096` or OOMs Metal at larger budgets.
+    /// Read at the start of every `stream(...)` call so flipping it via the
+    /// inspector takes effect on the next turn.
+    public var thinkingEnabled: Bool = false
     private var container: ModelContainer?
     private let modelDirectory: URL
 
@@ -159,8 +165,12 @@ public final class InferenceEngine {
         tools: [ToolSpec],
         cacheSlot: KVCacheSlot? = nil
     ) -> AsyncStream<StreamEvent> {
-        AsyncStream { continuation in
-            let task = Task { [container] in
+        // Snapshot the toggle now so flipping it mid-turn doesn't change
+        // mid-stream. KV cache will detect the prompt-shape change on the
+        // next call and re-prefill cleanly via `KVCacheSlot.prefixSkip`.
+        let thinking = self.thinkingEnabled
+        return AsyncStream { continuation in
+            let task = Task { [container, thinking] in
                 guard let container else { continuation.finish(); return }
                 let chat: [Chat.Message] = messages.compactMap { msg in
                     switch msg.role {
@@ -193,14 +203,7 @@ public final class InferenceEngine {
                         input: UserInput(
                             chat: chat,
                             tools: tools.isEmpty ? nil : tools,
-                            // Thinking disabled: every turn becomes
-                            // action-only. The model still plans via
-                            // todo_write but skips the 3-5K-token chain-of-
-                            // thought preamble that otherwise eats most of
-                            // the per-turn budget and balloons KV cache
-                            // memory across long sessions (verified OOM on
-                            // multi-fetch runs with thinking enabled).
-                            additionalContext: ["enable_thinking": false]
+                            additionalContext: ["enable_thinking": thinking]
                         )
                     )
                     let promptTokens = lmInput.text.tokens.asArray(Int.self)

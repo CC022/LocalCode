@@ -331,6 +331,16 @@ private struct ActionsRow: View {
                   ? "Hide raw model I/O"
                   : "Show raw model I/O (developer mode)")
 
+            Button {
+                app.engine.thinkingEnabled.toggle()
+            } label: {
+                Label("Think", systemImage: "brain")
+            }
+            .tint(app.engine.thinkingEnabled ? .accentColor : .secondary)
+            .help(app.engine.thinkingEnabled
+                  ? "Disable chain-of-thought (faster, less memory)"
+                  : "Enable chain-of-thought (slower, may OOM on long sessions)")
+
             Spacer()
         }
         .controlSize(.small)
