@@ -11,6 +11,7 @@ final class AppState {
     static let backendKey = "engine.backend"
     static let apiBaseURLKey = "api.baseURL"
     static let apiModelKey = "api.model"
+    static let thinkingEnabledKey = "engine.thinkingEnabled"
 
     /// Whether the API config sheet is currently presented. Toggled from the
     /// inspector's "Configure" button.
@@ -64,6 +65,9 @@ final class AppState {
            let backend = InferenceEngine.Backend(rawValue: raw) {
             engine.backend = backend
         }
+        // Thinking toggle persists across launches. `bool(forKey:)` returns
+        // `false` for unset keys, which matches the engine default.
+        engine.thinkingEnabled = UserDefaults.standard.bool(forKey: Self.thinkingEnabledKey)
 
         // Local-side warm-up. Skipped when the user is in API mode at launch —
         // no point spinning Metal if they don't intend to use the local model.
@@ -75,6 +79,12 @@ final class AppState {
                 showModelDownloadPrompt = true
             }
         }
+    }
+
+    /// Persist the thinking toggle. Called from the inspector's Display card.
+    func setThinkingEnabled(_ b: Bool) {
+        engine.thinkingEnabled = b
+        UserDefaults.standard.set(b, forKey: Self.thinkingEnabledKey)
     }
 
     /// Persist the current backend choice. Called from the inspector picker.

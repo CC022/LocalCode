@@ -1,5 +1,6 @@
 import AgentCore
 import AppKit
+import Darwin
 import SwiftUI
 import UniformTypeIdentifiers
 
@@ -16,6 +17,7 @@ struct TasksInspector: View {
                 TasksSection()
                 ConversationSection()
                 DisplaySection()
+                MemorySection()
             }
             .padding(12)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -526,7 +528,7 @@ private struct DisplaySection: View {
                     title: "Thinking",
                     isOn: Binding(
                         get: { app.engine.thinkingEnabled },
-                        set: { app.engine.thinkingEnabled = $0 }
+                        set: { app.setThinkingEnabled($0) }
                     )
                 )
                 .help("Enable chain-of-thought (slower, may OOM on long sessions)")
@@ -560,4 +562,47 @@ private struct ToggleRow: View {
         .toggleStyle(.switch)
         .controlSize(.small)
     }
+}
+
+// MARK: - Memory
+
+/// Live process memory footprint, refreshed at 1 Hz via `TimelineView`. The
+/// number matches what Activity Monitor's "Memory" column shows — sourced
+/// from Mach's `phys_footprint`, which counts dirty + compressed pages and
+/// is the closest thing macOS has to a canonical "this app is using N MB".
+private struct MemorySection: View {
+    var body: some View {
+        Card(title: "Memory") {
+            TimelineView(.periodic(from: .now, by: 1.0)) { _ in
+                HStack(spacing: 10) {
+                    Image(systemName: "memorychip")
+                        .foregroundStyle(.secondary)
+                        .frame(width: 16, alignment: .center)
+                    Text("Footprint")
+                        .font(.callout)
+                    Spacer()
+                    Text(processMemoryFootprint().formatted(.byteCount(style: .memory)))
+                        .font(.system(.callout, design: .monospaced))
+                        .foregroundStyle(.secondary)
+                        .monospacedDigit()
+                }
+                .padding(.vertical, 4)
+            }
+        }
+    }
+}
+
+/// Query Mach for this process's `phys_footprint`. Returns 0 on failure —
+/// the value would just briefly render as "Zero KB" before the next tick.
+private func processMemoryFootprint() -> Int64 {
+    var info = task_vm_info_data_t()
+    var count = mach_msg_type_number_t(
+        MemoryLayout<task_vm_info_data_t>.size / MemoryLayout<integer_t>.size
+    )
+    let result = withUnsafeMutablePointer(to: &info) { ptr in
+        ptr.withMemoryRebound(to: integer_t.self, capacity: Int(count)) {
+            task_info(mach_task_self_, task_flavor_t(TASK_VM_INFO), $0, &count)
+        }
+    }
+    return result == KERN_SUCCESS ? Int64(info.phys_footprint) : 0
 }

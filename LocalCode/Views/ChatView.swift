@@ -4,6 +4,12 @@ import SwiftUI
 struct ChatView: View {
     @Environment(AppState.self) private var app
 
+    /// True while the viewport is parked at (or within `bottomEpsilon` of) the
+    /// bottom of the chat. Streaming tokens only scroll the view when this is
+    /// true — so once the user scrolls up, decoding tokens stop yanking them
+    /// back. Flips true again automatically when they scroll back to bottom.
+    @State private var followBottom = true
+
     var body: some View {
         @Bindable var app = app
         VStack(spacing: 0) {
@@ -27,11 +33,17 @@ struct ChatView: View {
     }
 
     /// Changes when a new message is appended OR when the last message's text
-    /// grows during streaming. Used as a single trigger for auto-scroll.
-    private var scrollSignal: Int {
+    /// grows during streaming. Used as the trigger for tracking-scroll.
+    private var streamingTick: Int {
         guard let msgs = app.loop?.messages else { return 0 }
         let last = msgs.last(where: { !$0.isHiddenInUI })
         return msgs.count * 1_000_000 + (last?.text.count ?? 0)
+    }
+
+    /// Identity of the most recent user-role message. Changes on send, which
+    /// we treat as an explicit intent to follow the new turn.
+    private var lastUserID: UUID? {
+        app.loop?.messages.last(where: { $0.role == .user })?.id
     }
 
     private var messagesScroll: some View {
@@ -53,7 +65,29 @@ struct ChatView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
             }
             .defaultScrollAnchor(.bottom)
-            .onChange(of: scrollSignal) {
+            // Reactive source of truth: derive `followBottom` from actual
+            // scroll geometry, not from "did we just scroll programmatically".
+            // Within `bottomEpsilon` counts as parked — re-attaches the moment
+            // the user scrolls back down.
+            .onScrollGeometryChange(for: Bool.self) { geo in
+                let distance = geo.contentSize.height
+                             - geo.contentOffset.y
+                             - geo.containerSize.height
+                return distance < Self.bottomEpsilon
+            } action: { _, atBottom in
+                followBottom = atBottom
+            }
+            // Streaming tokens: track only if the user wants to be tracked.
+            // No animation — animated programmatic scrolls would feed the
+            // geometry callback intermediate offsets and risk detaching.
+            .onChange(of: streamingTick) {
+                guard followBottom else { return }
+                proxy.scrollTo(Self.bottomID, anchor: .bottom)
+            }
+            // New user turn: explicit intent — re-attach and snap, even if
+            // the user had previously scrolled up.
+            .onChange(of: lastUserID) {
+                followBottom = true
                 withAnimation(.easeOut(duration: 0.15)) {
                     proxy.scrollTo(Self.bottomID, anchor: .bottom)
                 }
@@ -66,4 +100,7 @@ struct ChatView: View {
     }
 
     private static let bottomID = "chat-bottom"
+    /// Slack between viewport bottom and content bottom that still counts as
+    /// "parked". Roughly one line of body text.
+    private static let bottomEpsilon: CGFloat = 24
 }
