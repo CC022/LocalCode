@@ -8,6 +8,13 @@ final class AppState {
     /// `LocalCodeApp` at launch to restore the session; written here on every
     /// pick so the value stays in sync (e.g. `@AppStorage` observers update).
     static let workingDirKey = "workingDirPath"
+    static let backendKey = "engine.backend"
+    static let apiBaseURLKey = "api.baseURL"
+    static let apiModelKey = "api.model"
+
+    /// Whether the API config sheet is currently presented. Toggled from the
+    /// inspector's "Configure" button.
+    var showAPIConfig = false
 
     let engine = InferenceEngine()
     var loop: AgentLoop?
@@ -41,12 +48,43 @@ final class AppState {
     }
 
     init() {
-        if engine.modelFilesAvailable {
-            // Start warming the model immediately — don't wait for the user to pick a folder.
+        // Restore persisted API config + backend choice. The Keychain lookup
+        // is keyed by the saved URL so changing providers later still finds
+        // the matching key.
+        let savedURL = UserDefaults.standard.string(forKey: Self.apiBaseURLKey)
+        let savedModel = UserDefaults.standard.string(forKey: Self.apiModelKey)
+        if savedURL != nil || savedModel != nil {
+            engine.apiConfig = APIConfig(
+                baseURL: savedURL ?? "https://api.openai.com/v1",
+                model: savedModel ?? "gpt-4o-mini",
+                apiKey: Keychain.load(savedURL ?? "") ?? ""
+            )
+        }
+        if let raw = UserDefaults.standard.string(forKey: Self.backendKey),
+           let backend = InferenceEngine.Backend(rawValue: raw) {
+            engine.backend = backend
+        }
+
+        // Local-side warm-up. Skipped when the user is in API mode at launch —
+        // no point spinning Metal if they don't intend to use the local model.
+        if engine.backend == .local {
+            if engine.modelFilesAvailable {
+                Task { await engine.load() }
+            } else {
+                engine.markModelMissing()
+                showModelDownloadPrompt = true
+            }
+        }
+    }
+
+    /// Persist the current backend choice. Called from the inspector picker.
+    func setBackend(_ b: InferenceEngine.Backend) {
+        engine.backend = b
+        UserDefaults.standard.set(b.rawValue, forKey: Self.backendKey)
+        // Lazy-load the local model on first switch back to local.
+        if b == .local, engine.modelFilesAvailable,
+           engine.state != .ready, engine.state != .loading {
             Task { await engine.load() }
-        } else {
-            engine.markModelMissing()
-            showModelDownloadPrompt = true
         }
     }
 
@@ -78,23 +116,31 @@ final class AppState {
         // Handled here so they don't reach `AgentLoop.send` and don't appear in
         // the transcript as user messages.
         switch text {
-        case "/clear":
-            loop.clear()
-            return
-        case "/compact":
-            isStreaming = true
-            let task = Task { await loop.compact() }
-            currentSend = task
-            await task.value
-            currentSend = nil
-            isStreaming = false
-            return
-        default:
-            break
+        case "/clear":   clearConversation(); return
+        case "/compact": await compactConversation(); return
+        default:         break
         }
 
         isStreaming = true
         let task = Task { await loop.send(text) }
+        currentSend = task
+        await task.value
+        currentSend = nil
+        isStreaming = false
+    }
+
+    /// Wipe the chat back to the system prompt. Exposed for the inspector's
+    /// Clear button; `/clear` in the input bar delegates here too.
+    func clearConversation() {
+        loop?.clear()
+    }
+
+    /// Summarize the chat into a single seed message to reclaim context. Same
+    /// flow as `send()` — flips `isStreaming`, tracks the task so Stop works.
+    func compactConversation() async {
+        guard let loop, !isStreaming else { return }
+        isStreaming = true
+        let task = Task { await loop.compact() }
         currentSend = task
         await task.value
         currentSend = nil

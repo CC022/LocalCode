@@ -10,21 +10,17 @@ import UniformTypeIdentifiers
 struct TasksInspector: View {
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: 14) {
                 WorkingDirectorySection()
                 ModelSection()
                 TasksSection()
+                ConversationSection()
+                DisplaySection()
             }
             .padding(12)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .frame(minWidth: 240, idealWidth: 280)
-        .safeAreaInset(edge: .bottom, spacing: 0) {
-            ActionsRow()
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
-                .background(.bar)
-        }
     }
 }
 
@@ -61,7 +57,7 @@ private struct Card<Content: View>: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background {
             RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .fill(.quaternary.opacity(0.4))
+                .fill(.background.secondary)
         }
     }
 }
@@ -112,15 +108,126 @@ private struct ModelSection: View {
     @Environment(AppState.self) private var app
 
     var body: some View {
+        @Bindable var app = app
         Card(title: "Model") {
-            switch app.engine.state {
-            case .ready:       readyBody
-            case .downloading: downloadingBody
-            case .loading:     iconLine(spinner: true, text: "Loading model…")
-            case .missing:     missingBody
-            case .failed(let m): failedBody(m)
-            case .idle:        iconLine(text: "Idle", color: .secondary)
+            VStack(alignment: .leading, spacing: 10) {
+                Picker("", selection: Binding(
+                    get: { app.engine.backend },
+                    set: { app.setBackend($0) }
+                )) {
+                    Text("Local").tag(InferenceEngine.Backend.local)
+                    Text("API").tag(InferenceEngine.Backend.api)
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+
+                stateBody
             }
+        }
+        .sheet(isPresented: $app.showAPIConfig) {
+            APIConfigSheet()
+        }
+    }
+
+    @ViewBuilder
+    private var stateBody: some View {
+        switch (app.engine.backend, app.engine.state) {
+        case (.api, .missing):
+            apiUnconfiguredBody
+        case (.api, _):
+            apiReadyBody    // API mode shares one body — phase + model are what matter
+        case (.local, .ready):
+            readyBody
+        case (.local, .downloading):
+            downloadingBody
+        case (.local, .loading):
+            iconLine(spinner: true, text: "Loading model…")
+        case (.local, .missing):
+            missingBody
+        case (.local, .failed(let m)):
+            failedBody(m)
+        case (.local, .idle):
+            iconLine(text: "Idle", color: .secondary)
+        }
+    }
+
+    private var apiReadyBody: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 6) {
+                Circle()
+                    .fill(stateDotColor)
+                    .frame(width: 7, height: 7)
+                Text(stateLabel)
+                    .font(.callout)
+                    .fontWeight(.medium)
+                Spacer()
+                if app.engine.inferencePhase != .idle {
+                    Text("streaming")
+                        .font(.caption2)
+                        .fontWeight(.medium)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(.tint.opacity(0.18), in: .capsule)
+                        .foregroundStyle(.tint)
+                }
+            }
+            Text(app.engine.modelName)
+                .font(.system(.caption, design: .monospaced))
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .truncationMode(.middle)
+                .textSelection(.enabled)
+            // Token count without progress bar — context window is unknown
+            // for arbitrary API providers.
+            if app.engine.tokenCount > 0 {
+                HStack(spacing: 4) {
+                    Text("Tokens").font(.caption2).foregroundStyle(.tertiary)
+                    Spacer()
+                    Text(Self.formatTokens(app.engine.tokenCount))
+                        .font(.system(.caption2, design: .monospaced))
+                        .foregroundStyle(.secondary)
+                        .monospacedDigit()
+                }
+            }
+            Button {
+                app.showAPIConfig = true
+            } label: {
+                Label("Configure", systemImage: "key")
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+        }
+    }
+
+    private var apiUnconfiguredBody: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            iconLine(systemImage: "key.slash", text: "API not configured", color: .secondary)
+            Button {
+                app.showAPIConfig = true
+            } label: {
+                Label("Configure API", systemImage: "key.fill")
+            }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.small)
+        }
+    }
+
+    private var stateDotColor: Color {
+        switch app.engine.state {
+        case .ready:        .green
+        case .failed:       .red
+        default:            .secondary
+        }
+    }
+
+    private var stateLabel: String {
+        switch app.engine.state {
+        case .ready:        "Ready"
+        case .failed:       "Failed"
+        case .idle:         "Idle"
+        case .loading:      "Loading…"
+        case .downloading:  "Downloading…"
+        case .missing:      "Not configured"
         }
     }
 
@@ -152,23 +259,26 @@ private struct ModelSection: View {
         }
     }
 
+    @ViewBuilder
     private var contextMeter: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack(spacing: 4) {
-                Text("Context")
-                    .font(.caption2)
-                    .foregroundStyle(.tertiary)
-                Spacer()
-                Text("\(Self.formatTokens(app.engine.tokenCount)) / \(Self.formatTokens(app.engine.contextWindow))")
-                    .font(.system(.caption2, design: .monospaced))
-                    .foregroundStyle(.secondary)
-                    .monospacedDigit()
+        if app.engine.contextWindow > 0 {
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(spacing: 4) {
+                    Text("Context")
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                    Spacer()
+                    Text("\(Self.formatTokens(app.engine.tokenCount)) / \(Self.formatTokens(app.engine.contextWindow))")
+                        .font(.system(.caption2, design: .monospaced))
+                        .foregroundStyle(.secondary)
+                        .monospacedDigit()
+                }
+                ProgressView(value: contextFraction)
+                    .progressViewStyle(.linear)
+                    .tint(contextFraction > 0.9 ? .red
+                          : contextFraction > 0.7 ? .orange
+                          : .accentColor)
             }
-            ProgressView(value: contextFraction)
-                .progressViewStyle(.linear)
-                .tint(contextFraction > 0.9 ? .red
-                      : contextFraction > 0.7 ? .orange
-                      : .accentColor)
         }
     }
 
@@ -305,47 +415,56 @@ private struct TasksSection: View {
     }
 }
 
-// MARK: - Actions
+// MARK: - Conversation
 
-private struct ActionsRow: View {
+/// Action card for chat-level operations. Each row is a tappable label that
+/// mirrors the Working Directory pattern — icon + name + trailing hint —
+/// so the whole inspector reads as one consistent stack of cards.
+private struct ConversationSection: View {
     @Environment(AppState.self) private var app
     @State private var justCopied = false
+    @State private var confirmingClear = false
 
     var body: some View {
-        HStack(spacing: 6) {
-            Button {
-                copyTranscript()
-            } label: {
-                Label(justCopied ? "Copied" : "Copy",
-                      systemImage: justCopied ? "checkmark" : "doc.on.clipboard")
-            }
-            .help("Copy full transcript to clipboard")
+        Card(title: "Conversation") {
+            VStack(alignment: .leading, spacing: 2) {
+                ActionRow(
+                    systemImage: "zipper.page",
+                    title: "Compact",
+                    busy: app.isStreaming,
+                    disabled: app.isStreaming
+                ) {
+                    Task { await app.compactConversation() }
+                }
+                .help("Summarize the chat into a single seed message to free context")
 
-            Button {
-                app.developerMode.toggle()
-            } label: {
-                Label("Raw", systemImage: "curlybraces")
-            }
-            .tint(app.developerMode ? .accentColor : .secondary)
-            .help(app.developerMode
-                  ? "Hide raw model I/O"
-                  : "Show raw model I/O (developer mode)")
+                ActionRow(
+                    systemImage: justCopied ? "checkmark" : "doc.on.clipboard",
+                    title: justCopied ? "Copied" : "Copy"
+                ) {
+                    copyTranscript()
+                }
+                .help("Copy full transcript to clipboard")
 
-            Button {
-                app.engine.thinkingEnabled.toggle()
-            } label: {
-                Label("Think", systemImage: "brain")
+                ActionRow(
+                    systemImage: "trash",
+                    title: "Clear"
+                ) {
+                    confirmingClear = true
+                }
+                .help("Erase all messages and reset the agent's context")
             }
-            .tint(app.engine.thinkingEnabled ? .accentColor : .secondary)
-            .help(app.engine.thinkingEnabled
-                  ? "Disable chain-of-thought (faster, less memory)"
-                  : "Enable chain-of-thought (slower, may OOM on long sessions)")
-
-            Spacer()
         }
-        .controlSize(.small)
-        .buttonStyle(.bordered)
-        .labelStyle(.titleAndIcon)
+        .confirmationDialog(
+            "Clear conversation?",
+            isPresented: $confirmingClear,
+            titleVisibility: .visible
+        ) {
+            Button("Clear", role: .destructive) { app.clearConversation() }
+            Button("Cancel", role: .cancel) { }
+        } message: {
+            Text("This erases all messages and resets the agent's context.")
+        }
     }
 
     private func copyTranscript() {
@@ -356,5 +475,89 @@ private struct ActionsRow: View {
             try? await Task.sleep(for: .seconds(1.2))
             justCopied = false
         }
+    }
+}
+
+private struct ActionRow: View {
+    let systemImage: String
+    let title: String
+    var busy: Bool = false
+    var disabled: Bool = false
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 10) {
+                Group {
+                    if busy {
+                        ProgressView().controlSize(.small)
+                    } else {
+                        Image(systemName: systemImage)
+                    }
+                }
+                .frame(width: 16, alignment: .center)
+                .foregroundStyle(.secondary)
+                Text(title)
+                Spacer()
+            }
+            .font(.callout)
+            .padding(.vertical, 4)
+            .contentShape(.rect)
+        }
+        .buttonStyle(.plain)
+        .disabled(disabled)
+        .opacity(disabled ? 0.5 : 1)
+    }
+}
+
+// MARK: - Display
+
+/// Toggle card for view-mode preferences. Uses native macOS switch toggles
+/// so the on/off state is unambiguous without needing tint cues.
+private struct DisplaySection: View {
+    @Environment(AppState.self) private var app
+
+    var body: some View {
+        @Bindable var app = app
+        Card(title: "Display") {
+            VStack(alignment: .leading, spacing: 6) {
+                ToggleRow(
+                    systemImage: "apple.intelligence",
+                    title: "Thinking",
+                    isOn: Binding(
+                        get: { app.engine.thinkingEnabled },
+                        set: { app.engine.thinkingEnabled = $0 }
+                    )
+                )
+                .help("Enable chain-of-thought (slower, may OOM on long sessions)")
+
+                ToggleRow(
+                    systemImage: "curlybraces",
+                    title: "Raw",
+                    isOn: $app.developerMode
+                )
+                .help("Show raw model I/O (developer mode)")
+            }
+        }
+    }
+}
+
+private struct ToggleRow: View {
+    let systemImage: String
+    let title: String
+    @Binding var isOn: Bool
+
+    var body: some View {
+        Toggle(isOn: $isOn) {
+            HStack(spacing: 10) {
+                Image(systemName: systemImage)
+                    .foregroundStyle(.secondary)
+                    .frame(width: 16, alignment: .center)
+                Text(title)
+                    .font(.callout)
+            }
+        }
+        .toggleStyle(.switch)
+        .controlSize(.small)
     }
 }

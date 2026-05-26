@@ -39,6 +39,19 @@ public final class InferenceEngine {
         case decode
     }
 
+    /// Which inference path `stream(...)` dispatches to. Default `.local`.
+    public enum Backend: String, Codable, CaseIterable, Sendable {
+        case local, api
+    }
+    public var backend: Backend = .local {
+        didSet { recomputeStateForBackend() }
+    }
+    /// Connection params for `.api` mode. Setting this (e.g. after the user
+    /// saves the config sheet) re-evaluates whether the API state is ready.
+    public var apiConfig: APIConfig = .init() {
+        didSet { recomputeStateForBackend() }
+    }
+
     public var state: LoadState = .idle
     public var inferencePhase: InferencePhase = .idle
     public var tokenCount: Int = 0
@@ -48,10 +61,13 @@ public final class InferenceEngine {
     /// machine, thinking burns 3-5K tokens per turn and either truncates
     /// tool-call bodies at `maxTokens=4096` or OOMs Metal at larger budgets.
     /// Read at the start of every `stream(...)` call so flipping it via the
-    /// inspector takes effect on the next turn.
+    /// inspector takes effect on the next turn. Only used in `.local` mode.
     public var thinkingEnabled: Bool = false
     private var container: ModelContainer?
     private let modelDirectory: URL
+    /// Remembered local-backend state so flipping `.api → .local` restores it
+    /// without re-running `load()`.
+    private var localState: LoadState = .idle
 
     nonisolated public static let modelRepository = "mlx-community/gemma-4-26b-a4b-it-4bit"
     nonisolated public static let modelDirectoryName = "gemma-4-26b-a4b-it-4bit"
@@ -67,41 +83,66 @@ public final class InferenceEngine {
             .appendingPathComponent(modelDirectoryName, isDirectory: true)
     }
 
-    public var modelName: String { modelDirectory.lastPathComponent }
+    public var modelName: String {
+        backend == .api
+            ? (apiConfig.model.isEmpty ? "API model" : apiConfig.model)
+            : modelDirectory.lastPathComponent
+    }
     public var modelPath: URL { modelDirectory }
     public var modelFilesAvailable: Bool { Self.hasUsableModelFiles(at: modelDirectory) }
 
     public func markModelMissing() {
         state = .missing
+        if backend == .local { localState = .missing }
+    }
+
+    /// Map the active backend to the unified `state` field the UI reads.
+    /// `.local` keeps the most-recently-set `localState` (loading/ready/etc.);
+    /// `.api` is purely config-derived (ready iff config is complete).
+    private func recomputeStateForBackend() {
+        switch backend {
+        case .local:
+            state = localState
+        case .api:
+            state = apiConfig.isComplete ? .ready : .missing
+        }
+    }
+
+    /// Write to `localState` and mirror it to the public `state` when local is
+    /// the active backend. Keeps the local-side lifecycle (loading → ready /
+    /// failed) intact even when the user is currently viewing API mode.
+    private func setLocalState(_ s: LoadState) {
+        localState = s
+        if backend == .local { state = s }
     }
 
     public func load() async {
-        guard state != .ready, state != .loading else { return }
+        guard localState != .ready, localState != .loading else { return }
         guard modelFilesAvailable else {
-            state = .missing
+            setLocalState(.missing)
             return
         }
-        state = .loading
+        setLocalState(.loading)
         contextWindow = Self.readContextWindow(at: modelDirectory) ?? 8192
         do {
             container = try await VLMModelFactory.shared.loadContainer(
                 from: modelDirectory,
                 using: #huggingFaceTokenizerLoader()
             )
-            state = .ready
+            setLocalState(.ready)
         } catch {
-            state = .failed("\(error)")
+            setLocalState(.failed("\(error)"))
         }
     }
 
     public func downloadAndLoad() async {
-        guard state != .ready, state != .loading, state != .downloading else { return }
+        guard localState != .ready, localState != .loading, localState != .downloading else { return }
         guard let repo = HuggingFace.Repo.ID(rawValue: Self.modelRepository) else {
-            state = .failed("Invalid Hugging Face repository: \(Self.modelRepository)")
+            setLocalState(.failed("Invalid Hugging Face repository: \(Self.modelRepository)"))
             return
         }
 
-        state = .downloading
+        setLocalState(.downloading)
         downloadProgress = 0
         do {
             let root = modelDirectory.deletingLastPathComponent().deletingLastPathComponent()
@@ -123,7 +164,7 @@ public final class InferenceEngine {
             )
             await load()
         } catch {
-            state = .failed("\(error)")
+            setLocalState(.failed("\(error)"))
         }
     }
 
@@ -161,6 +202,43 @@ public final class InferenceEngine {
     /// lazy-allocates from the model. Discard the slot (or call `.reset()`) to
     /// start a fresh prefill.
     func stream(
+        messages: [Message],
+        tools: [ToolSpec],
+        cacheSlot: KVCacheSlot? = nil
+    ) -> AsyncStream<StreamEvent> {
+        switch backend {
+        case .api:
+            return streamAPI(messages: messages, tools: tools)
+        case .local:
+            return streamLocal(messages: messages, tools: tools, cacheSlot: cacheSlot)
+        }
+    }
+
+    /// API path. cacheSlot is unused — KV caching only applies on-device.
+    /// Phase flips `.idle → .decode → .idle` so the inspector still shows
+    /// streaming activity in the same indicator as local mode.
+    private func streamAPI(messages: [Message], tools: [ToolSpec]) -> AsyncStream<StreamEvent> {
+        let config = self.apiConfig
+        inferencePhase = .decode
+        return AsyncStream { continuation in
+            let task = Task {
+                for await event in streamOpenAI(
+                    messages: messages,
+                    tools: tools,
+                    config: config,
+                    onUsage: { [weak self] total in self?.tokenCount = total }
+                ) {
+                    continuation.yield(event)
+                }
+                await MainActor.run { self.inferencePhase = .idle }
+                continuation.finish()
+            }
+            continuation.onTermination = { _ in task.cancel() }
+        }
+    }
+
+    /// Renamed from the original `stream` body — preserved as-is below.
+    private func streamLocal(
         messages: [Message],
         tools: [ToolSpec],
         cacheSlot: KVCacheSlot? = nil

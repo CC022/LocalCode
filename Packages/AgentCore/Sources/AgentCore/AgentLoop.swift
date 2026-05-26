@@ -64,6 +64,10 @@ public final class AgentLoop {
             messages.append(.assistant(""))
 
             var buffer = ""
+            // Out-of-band reasoning channel used by API backends (e.g.
+            // DeepSeek's `delta.reasoning_content`). Stays empty for local
+            // mode, where thinking is parsed from `buffer` via GemmaWireFormat.
+            var reasoningBuffer = ""
             var pendingCall: AgentToolCall?
 
             for await event in engine.stream(messages: snapshot, tools: tools.toolSpecs, cacheSlot: cacheSlot) {
@@ -76,7 +80,14 @@ public final class AgentLoop {
                     // the bubble clean during streaming.
                     let live = GemmaWireFormat.parse(buffer, includeOpenThinking: true)
                     messages[assistantIdx].text = live.text
-                    messages[assistantIdx].thinking = live.thinking
+                    // Don't clobber API-emitted reasoning with the (always-nil)
+                    // GemmaWireFormat parse on API text.
+                    if reasoningBuffer.isEmpty {
+                        messages[assistantIdx].thinking = live.thinking
+                    }
+                case .reasoning(let delta):
+                    reasoningBuffer += delta
+                    messages[assistantIdx].thinking = reasoningBuffer
                 case .toolCall(let mlxCall):
                     pendingCall = AgentToolCall(mlxCall)
                 }
@@ -90,7 +101,7 @@ public final class AgentLoop {
                 let live = GemmaWireFormat.parse(buffer, includeOpenThinking: true)
                 let suffix = live.text.isEmpty ? "[stopped]" : "\n[stopped]"
                 messages[assistantIdx].text = live.text + suffix
-                messages[assistantIdx].thinking = live.thinking
+                messages[assistantIdx].thinking = reasoningBuffer.isEmpty ? live.thinking : reasoningBuffer
                 return
             }
 
@@ -103,7 +114,7 @@ public final class AgentLoop {
             // GemmaWireFormat.tokenize).
             let parsed = GemmaWireFormat.parse(buffer, includeOpenThinking: true)
             messages[assistantIdx].text = parsed.text
-            messages[assistantIdx].thinking = parsed.thinking
+            messages[assistantIdx].thinking = reasoningBuffer.isEmpty ? parsed.thinking : reasoningBuffer
             let effectiveCall = pendingCall ?? parsed.toolCall
 
             guard let call = effectiveCall else {
