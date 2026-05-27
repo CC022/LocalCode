@@ -37,6 +37,7 @@ public final class AgentLoop {
             WebSearchTool(),
             WebFetchTool(),
             ParsePDFTool(cwd: cwd),
+            TranslateMDTool(cwd: cwd, engine: engine),
         ])
     }
 

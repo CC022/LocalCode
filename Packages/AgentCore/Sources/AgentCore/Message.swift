@@ -44,6 +44,10 @@ public struct AgentToolCall: Equatable, Sendable {
                 return "parse PDF \(p) (pages \(pages))"
             }
             return "parse PDF \(p)"
+        case "translate_md":
+            let p = arguments["path"]?.string ?? ""
+            let lang = arguments["target_language"]?.string ?? "?"
+            return "translate \(p) → \(lang)"
         case "todo_write":
             // `todos` is a JSON-encoded string (see TodoWriteTool for why).
             let count: Int = {

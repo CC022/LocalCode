@@ -139,6 +139,30 @@ func run() async {
     stderr("Ready · \(engine.modelName) · context \(engine.contextWindow)\n")
     stderr("cwd: \(cwd.path)\n\n")
 
+    // Debug path: bypass the agent loop and invoke translate_md directly so
+    // we can iterate on the tool without a full chat round-trip. Set:
+    //   LOCALCODE_TRANSLATE_DEBUG_PATH=...   (markdown under cwd)
+    //   LOCALCODE_TRANSLATE_DEBUG_LANG=...   (e.g. "Chinese (Simplified)")
+    // optional:
+    //   LOCALCODE_TRANSLATE_DEBUG_CHARS=800  (tiny chunks for fast iteration)
+    //   LOCALCODE_TRANSLATE_DEBUG_OUTPUT=... (output path)
+    let env = ProcessInfo.processInfo.environment
+    if let dbgPath = env["LOCALCODE_TRANSLATE_DEBUG_PATH"],
+       let dbgLang = env["LOCALCODE_TRANSLATE_DEBUG_LANG"] {
+        let dbgChars = env["LOCALCODE_TRANSLATE_DEBUG_CHARS"].flatMap(Int.init)
+        let dbgOut = env["LOCALCODE_TRANSLATE_DEBUG_OUTPUT"]
+        stderr("[translate-debug] path=\(dbgPath) lang=\(dbgLang) chunkChars=\(dbgChars.map(String.init) ?? "default")\n")
+        let started = Date()
+        let result = await DebugEntries.translateMD(
+            cwd: cwd, engine: engine,
+            path: dbgPath, targetLanguage: dbgLang,
+            chunkChars: dbgChars, outputPath: dbgOut
+        )
+        stderr("[translate-debug] elapsed \(String(format: "%.1fs", Date().timeIntervalSince(started)))\n")
+        print(result)
+        exit(0)
+    }
+
     let permission = Permission(ask: askApproval)
     let hooks = HookRegistry()
     hooks.register(preTool: BuiltinHooks.permission(permission))

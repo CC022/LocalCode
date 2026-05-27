@@ -34,6 +34,7 @@ extension Skill {
     /// builtin under `Skills/Builtins/`.
     static let all: [Skill] = [
         .verifyBuild,
+        .translatePDF,
     ]
 
     /// Lookup table built once at module init.

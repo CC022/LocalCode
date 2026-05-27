@@ -204,13 +204,14 @@ public final class InferenceEngine {
     func stream(
         messages: [Message],
         tools: [ToolSpec],
-        cacheSlot: KVCacheSlot? = nil
+        cacheSlot: KVCacheSlot? = nil,
+        overrideParams: GenerateParameters? = nil
     ) -> AsyncStream<StreamEvent> {
         switch backend {
         case .api:
             return streamAPI(messages: messages, tools: tools)
         case .local:
-            return streamLocal(messages: messages, tools: tools, cacheSlot: cacheSlot)
+            return streamLocal(messages: messages, tools: tools, cacheSlot: cacheSlot, overrideParams: overrideParams)
         }
     }
 
@@ -241,7 +242,8 @@ public final class InferenceEngine {
     private func streamLocal(
         messages: [Message],
         tools: [ToolSpec],
-        cacheSlot: KVCacheSlot? = nil
+        cacheSlot: KVCacheSlot? = nil,
+        overrideParams: GenerateParameters? = nil
     ) -> AsyncStream<StreamEvent> {
         // Snapshot the toggle now so flipping it mid-turn doesn't change
         // mid-stream. KV cache will detect the prompt-shape change on the
@@ -274,7 +276,8 @@ public final class InferenceEngine {
                 // or a 100-row CSV in a final summarization. Larger values
                 // OOM'd Metal on multi-fetch sessions; smaller values cut
                 // write_file bodies short.
-                let params = GenerateParameters(maxTokens: 4096, temperature: 0.7)
+                let params = overrideParams
+                    ?? GenerateParameters(maxTokens: 4096, temperature: 0.7)
                 do {
                     await MainActor.run { self.inferencePhase = .prepare }
                     let lmInput = try await container.prepare(
