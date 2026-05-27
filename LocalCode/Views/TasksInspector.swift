@@ -236,27 +236,18 @@ private struct ModelSection: View {
     private var readyBody: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 6) {
-                Circle().fill(.green).frame(width: 7, height: 7)
-                Text("Ready")
-                    .font(.callout)
-                    .fontWeight(.medium)
+                Text(app.engine.modelName)
+                    .font(.system(.caption, design: .monospaced))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                    .textSelection(.enabled)
                 Spacer()
                 if app.engine.inferencePhase != .idle {
                     Text(app.engine.inferencePhase.rawValue)
-                        .font(.caption2)
-                        .fontWeight(.medium)
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 2)
-                        .background(.tint.opacity(0.18), in: .capsule)
-                        .foregroundStyle(.tint)
+                        .foregroundStyle(.secondary)
                 }
             }
-            Text(app.engine.modelName)
-                .font(.system(.caption, design: .monospaced))
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
-                .truncationMode(.middle)
-                .textSelection(.enabled)
             contextMeter
         }
     }
