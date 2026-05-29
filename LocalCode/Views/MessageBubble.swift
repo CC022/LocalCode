@@ -55,6 +55,11 @@ struct MessageBubble: View {
         if let call = message.toolCall {
             if let req = pendingApproval {
                 ApprovalView(request: req) { app.resolveApproval($0) }
+            } else if call.name == "plot", let spec = plotSpec(call) {
+                // The chart data lives in the call arguments, so we can draw it
+                // the moment the call appears — before the tool result lands.
+                PlotView(spec: spec)
+                toolDisclosure(call)
             } else {
                 toolDisclosure(call)
             }
@@ -62,6 +67,14 @@ struct MessageBubble: View {
         if pre.isEmpty && message.toolCall == nil {
             Text("…").foregroundStyle(.secondary)
         }
+    }
+
+    /// Decode the chart spec from a `plot` call's arguments, or nil if it's
+    /// absent/malformed (then we fall back to the plain result disclosure,
+    /// which surfaces the tool's error text).
+    private func plotSpec(_ call: AgentToolCall) -> PlotSpec? {
+        guard let json = call.stringArg("spec") else { return nil }
+        return try? PlotSpec.parse(json)
     }
 
     private func toolDisclosure(_ call: AgentToolCall) -> some View {

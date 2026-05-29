@@ -15,6 +15,13 @@ public struct AgentToolCall: Equatable, Sendable {
         self.arguments = mlx.function.arguments
     }
 
+    /// String value of an argument, or nil if absent / not a string. Lets the
+    /// UI read call arguments without importing MLXLMCommon's `JSONValue`.
+    public func stringArg(_ key: String) -> String? {
+        if case .string(let s)? = arguments[key] { return s }
+        return nil
+    }
+
     /// Compact human-readable summary for UI labels.
     public var summary: String {
         switch name {
@@ -48,6 +55,11 @@ public struct AgentToolCall: Equatable, Sendable {
             let p = arguments["path"]?.string ?? ""
             let lang = arguments["target_language"]?.string ?? "?"
             return "translate \(p) → \(lang)"
+        case "plot":
+            if let spec = arguments["spec"]?.string, let p = try? PlotSpec.parse(spec) {
+                return "plot \(p.kind.rawValue) · \(p.series.count) series"
+            }
+            return "plot"
         case "todo_write":
             // `todos` is a JSON-encoded string (see TodoWriteTool for why).
             let count: Int = {
