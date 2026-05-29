@@ -10,6 +10,11 @@ struct ChatView: View {
     /// back. Flips true again automatically when they scroll back to bottom.
     @State private var followBottom = true
 
+    /// True only while a *user* gesture is driving the scroll (drag / momentum),
+    /// as opposed to streaming relayout or a programmatic scroll. We update
+    /// `followBottom` from geometry only when this is set.
+    @State private var userScrolling = false
+
     var body: some View {
         @Bindable var app = app
         VStack(spacing: 0) {
@@ -65,8 +70,16 @@ struct ChatView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
             }
             .defaultScrollAnchor(.bottom)
-            // Reactive source of truth: derive `followBottom` from actual
-            // scroll geometry, not from "did we just scroll programmatically".
+            // Only the user's own gesture may detach / re-attach bottom-follow.
+            // Streaming relayout and programmatic scrolls report `.idle` /
+            // `.animating`; if those drove `followBottom`, the bottom anchor
+            // sliding down as tokens stream in would read "not at bottom" and
+            // detach us mid-generation.
+            .onScrollPhaseChange { _, phase in
+                userScrolling = phase == .tracking
+                             || phase == .interacting
+                             || phase == .decelerating
+            }
             // Within `bottomEpsilon` counts as parked — re-attaches the moment
             // the user scrolls back down.
             .onScrollGeometryChange(for: Bool.self) { geo in
@@ -75,7 +88,7 @@ struct ChatView: View {
                              - geo.containerSize.height
                 return distance < Self.bottomEpsilon
             } action: { _, atBottom in
-                followBottom = atBottom
+                if userScrolling { followBottom = atBottom }
             }
             // Streaming tokens: track only if the user wants to be tracked.
             // No animation — animated programmatic scrolls would feed the
