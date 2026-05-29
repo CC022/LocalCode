@@ -76,10 +76,8 @@ public final class AgentLoop {
                 switch event {
                 case .text(let delta):
                     buffer += delta
-                    // Strip thought channel + leaked tool-call markers from
-                    // the visible text on every chunk, and surface the
-                    // (possibly in-progress) thinking separately. This keeps
-                    // the bubble clean during streaming.
+                    // Strip the thought channel + leaked tool-call markers from
+                    // the visible text each chunk; surface thinking separately.
                     let live = GemmaWireFormat.parse(buffer, includeOpenThinking: true)
                     messages[assistantIdx].text = live.text
                     // Don't clobber API-emitted reasoning with the (always-nil)
@@ -95,10 +93,8 @@ public final class AgentLoop {
                 }
             }
 
-            // Cancellation can land mid-stream: the inner Task breaks, the
-            // AsyncStream finishes, and we get here with no pending call. Mark
-            // the partial assistant turn as stopped instead of treating it as
-            // a natural completion.
+            // Cancellation can land mid-stream: the stream finishes with no
+            // pending call. Mark the partial turn stopped, not naturally done.
             if Task.isCancelled {
                 let live = GemmaWireFormat.parse(buffer, includeOpenThinking: true)
                 let suffix = live.text.isEmpty ? "[stopped]" : "\n[stopped]"
@@ -107,13 +103,11 @@ public final class AgentLoop {
                 return
             }
 
-            // Final pass: surface the thought block (closed *or* unclosed —
-            // the model can hit maxTokens / EOS mid-thinking, and dropping the
-            // body in that case would erase the assistant turn the user just
-            // watched stream in) and recover a tool call whose `<|tool_call>`
-            // opener was swallowed by the detokenizer (Gemma 4 thinking mode
-            // reproducibly leaks the body into the chunk stream — see
-            // GemmaWireFormat.tokenize).
+            // Final pass: keep the thought block even when unclosed (the model
+            // can stop mid-thinking at maxTokens/EOS; dropping it erases the
+            // turn the user watched stream in), and recover a tool call whose
+            // `<|tool_call>` opener the detokenizer swallowed — a reproducible
+            // Gemma 4 thinking-mode leak (see GemmaWireFormat.tokenize).
             let parsed = GemmaWireFormat.parse(buffer, includeOpenThinking: true)
             messages[assistantIdx].text = parsed.text
             messages[assistantIdx].thinking = reasoningBuffer.isEmpty ? parsed.thinking : reasoningBuffer
@@ -211,24 +205,13 @@ public final class AgentLoop {
 
     /// Flatten the visible chat into a single string for the summarizer.
     private func renderTranscript() -> String {
-        messages.dropFirst().map { msg in
-            let role: String = switch msg.role {
-            case .system:    "SYSTEM"
-            case .user:      "USER"
-            case .assistant: "ASSISTANT"
-            case .tool:      "TOOL"
+        messages.dropFirst().map { m in
+            var s = "[\(m.role.label)]\n\(m.text)"
+            if let call = m.toolCall { s += "\n[tool_call] \(call.summary)" }
+            if let result = m.toolResult {
+                s += "\n[tool_result]\n\(result.clipped(to: 2000, withCount: false))"
             }
-            var out = "[\(role)]\n\(msg.text)"
-            if let call = msg.toolCall {
-                out += "\n[tool_call] \(call.summary)"
-            }
-            if let result = msg.toolResult {
-                let clipped = result.count > 2000
-                    ? String(result.prefix(2000)) + "\n…(truncated)"
-                    : result
-                out += "\n[tool_result]\n\(clipped)"
-            }
-            return out
+            return s
         }.joined(separator: "\n\n")
     }
 }

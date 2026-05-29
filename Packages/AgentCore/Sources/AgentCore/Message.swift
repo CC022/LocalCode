@@ -65,7 +65,20 @@ public struct AgentToolCall: Equatable, Sendable {
 }
 
 public struct Message: Identifiable, Equatable {
-    public enum Role: Sendable { case system, user, assistant, tool }
+    public enum Role: Sendable {
+        case system, user, assistant, tool
+
+        /// Uppercase label for plain-text transcript dumps. (The chat-template
+        /// tag differs — `.assistant` is "model" there — and lives elsewhere.)
+        public var label: String {
+            switch self {
+            case .system:    "SYSTEM"
+            case .user:      "USER"
+            case .assistant: "ASSISTANT"
+            case .tool:      "TOOL"
+            }
+        }
+    }
 
     public let id = UUID()
     public let role: Role

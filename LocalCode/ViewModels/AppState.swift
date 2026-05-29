@@ -169,36 +169,19 @@ final class AppState {
         cont?.resume(returning: choice)
     }
 
-    /// Format the full chat (including hidden tool_result messages) for debugging.
-    /// Each turn emits any thinking block, the assistant/user/system text, and
-    /// the tool call + tool result for assistant turns. Without these fields a
-    /// dumped transcript can look mysteriously blank — e.g. an assistant turn
-    /// that consisted purely of a `load_skill` tool call would render as an
-    /// empty `--- ASSISTANT ---` block, hiding the real model behavior.
+    /// Format the full chat (system prompt, thinking, hidden tool results) for
+    /// copy-to-clipboard / debugging.
     func exportTranscript() -> String {
         guard let loop else { return "(no chat yet)" }
         var out = "# LocalCode transcript\ncwd: \(loop.cwd.path)\n"
-        for msg in loop.messages {
-            let role: String = switch msg.role {
-            case .system:    "SYSTEM"
-            case .user:      "USER"
-            case .assistant: "ASSISTANT"
-            case .tool:      "TOOL"
-            }
-            out += "\n--- \(role) ---\n"
-            if let thinking = msg.thinking, !thinking.isEmpty {
-                out += "[thinking]\n\(thinking)\n"
-            }
-            if !msg.text.isEmpty {
-                out += "\(msg.text)\n"
-            }
-            if let call = msg.toolCall {
+        for m in loop.messages {
+            out += "\n--- \(m.role.label) ---\n"
+            if let t = m.thinking, !t.isEmpty { out += "[thinking]\n\(t)\n" }
+            if !m.text.isEmpty { out += "\(m.text)\n" }
+            if let call = m.toolCall {
                 out += "[tool_call] \(call.summary)\n"
-                if let result = msg.toolResult {
-                    let clipped = result.count > 2000
-                        ? String(result.prefix(2000)) + "\n…(truncated)"
-                        : result
-                    out += "[tool_result]\n\(clipped)\n"
+                if let r = m.toolResult {
+                    out += "[tool_result]\n\(r.clipped(to: 2000, withCount: false))\n"
                 }
             }
         }

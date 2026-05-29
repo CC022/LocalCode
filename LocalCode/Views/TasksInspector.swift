@@ -557,10 +557,8 @@ private struct ToggleRow: View {
 
 // MARK: - Memory
 
-/// Live process memory footprint, refreshed at 1 Hz via `TimelineView`. The
-/// number matches what Activity Monitor's "Memory" column shows — sourced
-/// from Mach's `phys_footprint`, which counts dirty + compressed pages and
-/// is the closest thing macOS has to a canonical "this app is using N MB".
+/// Live process memory footprint (Mach `phys_footprint` — dirty + compressed
+/// pages), refreshed at 1 Hz. Matches Activity Monitor's "Memory" column.
 private struct MemorySection: View {
     var body: some View {
         Card(title: "Memory") {

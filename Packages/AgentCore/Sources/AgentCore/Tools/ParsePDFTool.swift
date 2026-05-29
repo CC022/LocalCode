@@ -66,17 +66,12 @@ struct ParsePDFTool: Tool {
             let mdURL = outputDir.appendingPathComponent("document.md")
             try markdown.write(to: mdURL, atomically: true, encoding: .utf8)
 
-            let cwdPrefix = cwd.path.hasSuffix("/") ? cwd.path : cwd.path + "/"
-            let relMD = mdURL.path.hasPrefix(cwdPrefix) ? String(mdURL.path.dropFirst(cwdPrefix.count)) : mdURL.path
-            let relImg = imagesDir.path.hasPrefix(cwdPrefix) ? String(imagesDir.path.dropFirst(cwdPrefix.count)) : imagesDir.path
+            let relMD = SafePath.relativize(mdURL, to: cwd)
+            let relImg = SafePath.relativize(imagesDir, to: cwd)
 
-            let previewLimit = 800
-            let preview: String
-            if markdown.count > previewLimit {
-                preview = String(markdown.prefix(previewLimit)) + "\n... (\(markdown.count - previewLimit) more chars; read_file the markdown for the rest)"
-            } else {
-                preview = markdown.isEmpty ? "(empty — PDF may be image-only)" : markdown
-            }
+            let preview = markdown.isEmpty
+                ? "(empty — PDF may be image-only)"
+                : markdown.clipped(to: 800)
 
             return """
             Parsed "\(pdfURL.lastPathComponent)": \(pageIndices.count) pages, \(totalFigures) figures extracted.

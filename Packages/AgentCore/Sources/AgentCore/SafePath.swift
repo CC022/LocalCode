@@ -14,6 +14,13 @@ enum SafePath {
         }
         return resolved
     }
+
+    /// Render `url` relative to `cwd` when inside the workspace, else its
+    /// absolute path. Pure string formatting for tool summaries.
+    static func relativize(_ url: URL, to cwd: URL) -> String {
+        let prefix = cwd.path.hasSuffix("/") ? cwd.path : cwd.path + "/"
+        return url.path.hasPrefix(prefix) ? String(url.path.dropFirst(prefix.count)) : url.path
+    }
 }
 
 enum SafePathError: LocalizedError {

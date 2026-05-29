@@ -2,44 +2,23 @@ import Foundation
 import MLXLMCommon
 import Synchronization
 
-/// A holder for a per-session KV cache, persisted across `InferenceEngine.stream`
-/// calls so the model only prefills the tail of the chat each turn instead of
-/// the entire history. Lifetime is tied to whoever owns the slot (typically an
-/// `AgentLoop`); creating a fresh `AgentLoop` discards the old slot and the old
-/// cache with it.
+/// A per-session KV cache persisted across `InferenceEngine.stream` calls so
+/// each turn only prefills the new tail of the chat, not the whole history.
+/// Owned by an `AgentLoop`; a fresh loop discards the cache with the slot.
 ///
-/// The slot tracks two things alongside the cache itself:
+/// Trust assumption: re-tokenizing the history through the same chat template
+/// reproduces the token IDs the model sampled. Gemma's BPE + its deterministic
+/// template holds this in practice; if it broke the symptom is incoherent
+/// output, which `reset()` (e.g. /clear) recovers from.
 ///
-/// - `lastPrompt`: the token IDs of the full prompt we fed last turn. Used to
-///   verify the head of the next prompt still matches before reusing the cache.
-///   If it diverges (rare — would only happen if the system prompt or earlier
-///   history was edited), we reset rather than silently corrupt the cache.
-/// - `cachedLength`: `cache[0].offset` observed after the last generation, i.e.
-///   how many tokens the cache actually holds (prompt + sampled output).
-///   The next turn feeds `newPrompt[cachedLength...]` so prefill only covers
-///   genuinely new content.
-///
-/// The "trust" assumption is that re-tokenizing the chat history through the
-/// same chat template produces, for the assistant turn, the same token IDs the
-/// model sampled. Gemma's BPE tokenizer + deterministic chat template makes
-/// this hold in practice. If it ever broke, the symptom would be incoherent
-/// output, in which case `reset()` (e.g. via /clear) recovers immediately.
-///
-/// `[KVCache]` is an array of class instances that the token iterator mutates
-/// during generation. Reusing the same array across turns is exactly how
-/// `MLXLMCommon.ChatSession` runs — the cache instances accumulate keys/values
-/// as more tokens are processed.
-///
-/// Thread-safety: backed by Swift's `Synchronization.Mutex`, so the same slot
-/// is safe to hand to a generate call running off the main actor. The
-/// `@unchecked Sendable` is needed because `KVCache` (an MLX class) is not
-/// itself Sendable — the contract is that the cache is only touched while the
-/// mutex is held, which `withLock` enforces.
+/// `@unchecked Sendable` because `KVCache` (an MLX class) isn't Sendable: the
+/// contract is that the cache is touched only under the `Mutex` (enforced by
+/// `withLock`), so the slot is safe to hand to an off-main generate call.
 public final class KVCacheSlot: @unchecked Sendable {
     private struct State {
         var cache: [KVCache]?
-        var lastPrompt: [Int]
-        var cachedLength: Int
+        var lastPrompt: [Int]   // full prompt fed last turn; head must still match to reuse
+        var cachedLength: Int   // cache[0].offset after last gen (prompt + sampled output)
     }
 
     private let storage = Mutex<State>(.init(cache: nil, lastPrompt: [], cachedLength: 0))

@@ -42,13 +42,7 @@ struct WebFetchTool: Tool {
                 prefix = "(note: page appears JavaScript-rendered — static HTML had little text. Try a different source, an API endpoint, or a CSV/JSON URL.)\n\n"
             }
 
-            let payload: String
-            if text.count > limit {
-                let dropped = text.count - limit
-                payload = String(text.prefix(limit)) + "\n... (\(dropped) more chars)"
-            } else {
-                payload = text.isEmpty ? "(empty body)" : text
-            }
+            let payload = text.isEmpty ? "(empty body)" : text.clipped(to: limit)
             return prefix + payload
         } catch {
             return "Error: \(error.localizedDescription)"

@@ -63,8 +63,7 @@ func render(_ m: Message) -> String {
         if let call = m.toolCall {
             parts.append("[TOOL CALL] \(call.summary)")
             if let r = m.toolResult {
-                let trimmed = r.count > 1000 ? String(r.prefix(1000)) + "\n…(truncated)" : r
-                parts.append("[TOOL RESULT]\n\(trimmed)")
+                parts.append("[TOOL RESULT]\n\(r.clipped(to: 1000, withCount: false))")
             }
         }
         return parts.isEmpty ? "[ASSISTANT] (empty)" : parts.joined(separator: "\n")

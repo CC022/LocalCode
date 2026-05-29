@@ -127,19 +127,12 @@ struct TranslateMDTool: Tool {
 
             let elapsed = Date().timeIntervalSince(started)
 
-            let cwdPrefix = cwd.path.hasSuffix("/") ? cwd.path : cwd.path + "/"
-            let relIn = inputURL.path.hasPrefix(cwdPrefix) ? String(inputURL.path.dropFirst(cwdPrefix.count)) : inputURL.path
-            let relOut = outputURL.path.hasPrefix(cwdPrefix) ? String(outputURL.path.dropFirst(cwdPrefix.count)) : outputURL.path
+            let relIn = SafePath.relativize(inputURL, to: cwd)
+            let relOut = SafePath.relativize(outputURL, to: cwd)
 
             // Short preview from the head of the output (already on disk).
-            let preview: String = {
-                guard let head = try? String(contentsOf: outputURL, encoding: .utf8) else { return "" }
-                let limit = 600
-                if head.count > limit {
-                    return String(head.prefix(limit)) + "\n... (\(head.count - limit) more chars)"
-                }
-                return head
-            }()
+            let preview = (try? String(contentsOf: outputURL, encoding: .utf8))?
+                .clipped(to: 600) ?? ""
 
             let warnLine = warnings.isEmpty
                 ? ""

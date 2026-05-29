@@ -57,11 +57,10 @@ public final class InferenceEngine {
     public var tokenCount: Int = 0
     public var contextWindow: Int = 0
     public var downloadProgress: Double = 0
-    /// User-controlled chain-of-thought switch. Default off because, on this
-    /// machine, thinking burns 3-5K tokens per turn and either truncates
-    /// tool-call bodies at `maxTokens=4096` or OOMs Metal at larger budgets.
-    /// Read at the start of every `stream(...)` call so flipping it via the
-    /// inspector takes effect on the next turn. Only used in `.local` mode.
+    /// User-controlled chain-of-thought switch (`.local` only). Default off:
+    /// thinking burns 3-5K tokens/turn and either truncates tool-call bodies at
+    /// `maxTokens=4096` or OOMs Metal at larger budgets. Read at the start of
+    /// each `stream(...)`, so flipping it takes effect on the next turn.
     public var thinkingEnabled: Bool = false
     private var container: ModelContainer?
     private let modelDirectory: URL
@@ -238,7 +237,6 @@ public final class InferenceEngine {
         }
     }
 
-    /// Renamed from the original `stream` body — preserved as-is below.
     private func streamLocal(
         messages: [Message],
         tools: [ToolSpec],
@@ -270,12 +268,10 @@ public final class InferenceEngine {
                         return .assistant(content)
                     }
                 }
-                // With thinking disabled (see additionalContext below), each
-                // turn is action-only and fits comfortably in 4096 tokens —
-                // enough for a write_file body with a ~3K-token parser script
-                // or a 100-row CSV in a final summarization. Larger values
-                // OOM'd Metal on multi-fetch sessions; smaller values cut
-                // write_file bodies short.
+                // With thinking off, each turn is action-only and fits in 4096
+                // tokens (a write_file body with a ~3K-token script, or a 100-row
+                // CSV summary). Larger OOM'd Metal on multi-fetch sessions;
+                // smaller cut write_file bodies short.
                 let params = overrideParams
                     ?? GenerateParameters(maxTokens: 4096, temperature: 0.7)
                 do {
@@ -291,18 +287,15 @@ public final class InferenceEngine {
                     let promptCount = promptTokens.count
                     await MainActor.run { self.tokenCount = promptCount }
 
-                    // Trim the input to just the tokens beyond what the cache
-                    // already holds. The cache covers `skip` tokens (last
-                    // turn's prompt + sampled output); the new prompt's first
-                    // `skip` tokens are required to match what's cached, so
-                    // re-feeding them would just duplicate work and corrupt
-                    // positions. If the slot reports a mismatch we reset it
-                    // and fall back to a fresh full prefill.
+                    // Feed only the tokens beyond what the cache holds. The
+                    // cache covers `skip` tokens (last prompt + sampled output);
+                    // the new prompt's first `skip` must match what's cached, so
+                    // re-feeding them duplicates work and corrupts positions. On
+                    // a mismatch the slot resets and we full-prefill instead.
                     //
-                    // Skip the cache path entirely when an image/video is in
-                    // play — Gemma 4's image embedding tokens don't map
-                    // cleanly to a 1:1 token slice, and this agent doesn't
-                    // use images.
+                    // Skip slicing entirely with an image/video in play — Gemma
+                    // 4's image embeddings don't map to a 1:1 token slice (and
+                    // this agent doesn't use images anyway).
                     let canSlice = lmInput.image == nil && lmInput.video == nil
                     var skip = 0
                     if let slot = cacheSlot {
@@ -333,15 +326,13 @@ public final class InferenceEngine {
                     let toolsForCall: [ToolSpec]? = tools.isEmpty ? nil : tools
                     let stream: AsyncStream<Generation> =
                         try await container.perform { context in
-                            // `makePromptCache` is mlx-swift-lm's documented entry
-                            // point — it defers to the model's own `newCache` so
-                            // we get the right per-layer cache mix (e.g. Gemma 4
-                            // uses RotatingKVCache for local-attention layers and
-                            // KVCacheSimple for global ones).
-                            //
-                            // The cache lives in `cacheSlot`; we don't pass it
-                            // out of this closure (it isn't `Sendable`). After
-                            // streaming completes we read `cacheSlot.currentOffset()`.
+                            // `makePromptCache` defers to the model's own
+                            // `newCache`, giving the right per-layer mix (Gemma 4
+                            // mixes RotatingKVCache for local-attention layers
+                            // with KVCacheSimple for global ones). The cache
+                            // stays in `cacheSlot` (it isn't `Sendable`, so it
+                            // never leaves this closure); we read its offset
+                            // afterward via `cacheSlot.currentOffset()`.
                             let cache: [KVCache]? = cacheSlot.map { slot in
                                 slot.getOrAllocate {
                                     makePromptCache(model: context.model, parameters: params)
@@ -380,14 +371,11 @@ public final class InferenceEngine {
                         }
                     }
 
-                    // Record what the cache now holds so the next call can
-                    // skip the matching head — but only when the stream
-                    // completed naturally. Breaking on a tool call leaves
-                    // the cache in an indeterminate state (the underlying
-                    // generate Task may absorb a token or two after we
-                    // return), and on cancellation we also can't trust the
-                    // tail, so we reset in both cases. The next turn will
-                    // re-prefill from scratch.
+                    // Record what the cache holds for next turn's skip — but
+                    // only on natural completion. A tool-call break leaves the
+                    // cache indeterminate (the generate Task may absorb a token
+                    // or two after we return), and a cancelled tail can't be
+                    // trusted either, so both reset and re-prefill next turn.
                     if Task.isCancelled || brokeOnToolCall {
                         cacheSlot?.reset()
                     } else if canSlice, let slot = cacheSlot,
