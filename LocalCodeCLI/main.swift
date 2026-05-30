@@ -128,14 +128,34 @@ func run() async {
             : FileManager.default.currentDirectoryPath
     )
 
-    stderr("Loading model from disk…\n")
+    let env = ProcessInfo.processInfo.environment
     let engine = InferenceEngine()
-    await engine.load()
-    guard case .ready = engine.state else {
-        stderr("Failed to load: \(engine.state)\n")
-        exit(1)
+
+    // Optional OpenAI-compatible API backend, configured purely from env so no
+    // endpoint/key ever touches the repo. Set all three to use it:
+    //   LOCALCODE_API_BASE=https://<host>/v1
+    //   LOCALCODE_API_MODEL=<model-name>
+    //   LOCALCODE_API_KEY=<key>
+    // When set, we skip loading the ~15 GB local model entirely.
+    if let base = env["LOCALCODE_API_BASE"], !base.isEmpty,
+       let model = env["LOCALCODE_API_MODEL"], !model.isEmpty,
+       let key = env["LOCALCODE_API_KEY"], !key.isEmpty {
+        engine.apiConfig = APIConfig(baseURL: base, model: model, apiKey: key)
+        engine.backend = .api
+        guard case .ready = engine.state else {
+            stderr("API config incomplete: \(engine.state)\n")
+            exit(1)
+        }
+        stderr("Ready · API · \(model) @ \(base)\n")
+    } else {
+        stderr("Loading model from disk…\n")
+        await engine.load()
+        guard case .ready = engine.state else {
+            stderr("Failed to load: \(engine.state)\n")
+            exit(1)
+        }
+        stderr("Ready · \(engine.modelName) · context \(engine.contextWindow)\n")
     }
-    stderr("Ready · \(engine.modelName) · context \(engine.contextWindow)\n")
     stderr("cwd: \(cwd.path)\n\n")
 
     // Debug path: bypass the agent loop and invoke translate_md directly so
@@ -145,7 +165,6 @@ func run() async {
     // optional:
     //   LOCALCODE_TRANSLATE_DEBUG_CHARS=800  (tiny chunks for fast iteration)
     //   LOCALCODE_TRANSLATE_DEBUG_OUTPUT=... (output path)
-    let env = ProcessInfo.processInfo.environment
     if let dbgPath = env["LOCALCODE_TRANSLATE_DEBUG_PATH"],
        let dbgLang = env["LOCALCODE_TRANSLATE_DEBUG_LANG"] {
         let dbgChars = env["LOCALCODE_TRANSLATE_DEBUG_CHARS"].flatMap(Int.init)

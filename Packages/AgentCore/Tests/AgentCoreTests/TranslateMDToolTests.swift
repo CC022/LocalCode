@@ -213,4 +213,44 @@ final class TranslateMDToolTests: XCTestCase {
         // substring map.
         XCTAssertEqual(TranslateMDTool.langCode(for: "Swiss German"), "de")
     }
+
+    // MARK: - End-to-end via an OpenAI-compatible API (env-gated)
+
+    /// Drives the real translate_md pipeline against any OpenAI-compatible
+    /// endpoint (e.g. DeepSeek). Skipped unless all of these are set:
+    ///   LOCALCODE_API_BASE, LOCALCODE_API_MODEL, LOCALCODE_API_KEY,
+    ///   LOCALCODE_MD_FIXTURE   (a markdown file to translate)
+    /// optional: LOCALCODE_MD_LANG (default "Chinese (Simplified)"),
+    ///           LOCALCODE_MD_CHARS, LOCALCODE_MD_KEEP=1
+    @MainActor
+    func testTranslateMDViaAPI() async throws {
+        let e = ProcessInfo.processInfo.environment
+        guard let base = e["LOCALCODE_API_BASE"], let model = e["LOCALCODE_API_MODEL"],
+              let key = e["LOCALCODE_API_KEY"], let mdPath = e["LOCALCODE_MD_FIXTURE"] else {
+            throw XCTSkip("Set LOCALCODE_API_BASE/MODEL/KEY + LOCALCODE_MD_FIXTURE to run.")
+        }
+        let lang = e["LOCALCODE_MD_LANG"] ?? "Chinese (Simplified)"
+        let engine = InferenceEngine()
+        engine.apiConfig = APIConfig(baseURL: base, model: model, apiKey: key)
+        engine.backend = .api
+        guard case .ready = engine.state else { return XCTFail("API config incomplete: \(engine.state)") }
+
+        let keep = e["LOCALCODE_MD_KEEP"] == "1"
+        let cwd = keep
+            ? FileManager.default.temporaryDirectory.appendingPathComponent("translate_md_test_keep")
+            : FileManager.default.temporaryDirectory.appendingPathComponent("translate_md_test_\(UUID().uuidString)")
+        try? FileManager.default.removeItem(at: cwd)
+        try FileManager.default.createDirectory(at: cwd, withIntermediateDirectories: true)
+        defer { if !keep { try? FileManager.default.removeItem(at: cwd) } }
+        if keep { print("=== keeping output at: \(cwd.path) ===") }
+
+        try FileManager.default.copyItem(at: URL(fileURLWithPath: mdPath),
+                                         to: cwd.appendingPathComponent("document.md"))
+        let result = await DebugEntries.translateMD(
+            cwd: cwd, engine: engine, path: "document.md",
+            targetLanguage: lang, chunkChars: e["LOCALCODE_MD_CHARS"].flatMap(Int.init)
+        )
+        print("=== translate_md result ===\n\(result)\n=== end ===")
+        XCTAssertFalse(result.hasPrefix("Error:"), "tool returned an error: \(result)")
+    }
 }

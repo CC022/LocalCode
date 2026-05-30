@@ -161,9 +161,11 @@ struct TranslateMDTool: Tool {
         let rules = """
         Translate the source Markdown above into \(targetLanguage).
         - Preserve Markdown syntax byte-for-byte: headers, lists, links, code fences, image placeholders, LaTeX math.
+        - Reproduce EVERY image placeholder line `![](...)` exactly as in the source, each on its own line. Never omit, merge, move, or rename one.
+        - Keep the same paragraph and blank-line structure as the source; do not merge separate paragraphs.
         - Keep `## Page N` (where N is a number) verbatim in English. Do not translate it.
-        - Do NOT translate: code blocks, inline code, URLs, image placeholders like ![](images/...), LaTeX math.
-        - Translate every other piece of prose, including section headers and figure captions.
+        - Do NOT translate: code blocks, inline code, URLs, image placeholders like ![](images/...), LaTeX math, citation markers like [12], author names.
+        - Translate every other piece of prose, including ALL section headers (e.g. Abstract, Introduction, References, Acknowledgements) and figure/table captions.
         - Translate exactly once. Do not repeat content. Output only the translation, no commentary or preface.
         """
 

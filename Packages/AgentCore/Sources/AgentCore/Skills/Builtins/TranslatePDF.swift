@@ -10,15 +10,21 @@ extension Skill {
         body: """
         # translate-pdf
 
-        PDFs don't translate directly — there's no native LaTeX/structure
-        recovery once a doc is rasterized to glyphs. The workflow is:
+        PDFs don't translate directly — translate the Markdown that `parse_pdf`
+        produces, then surface it. The workflow is:
 
         ## 1. Parse the PDF
 
         Call `parse_pdf` on the input file. It writes
         `<basename>.parsed/document.md` plus an `images/` directory of
-        extracted figure PNGs. The agent reads chunks of that markdown via
-        `read_file` if it needs to inspect content.
+        extracted figure and table PNGs. The markdown is structure-preserving:
+        real `#`/`##`/`###` headings (from font-size tiers), reflowed and
+        de-hyphenated paragraphs, correct 1-/2-column reading order, and a
+        `![](images/..)` placeholder wherever a figure or table was lifted out
+        (tables are rendered as images because their grid doesn't survive as
+        text). The agent reads chunks of that markdown via `read_file` if it
+        needs to inspect content. Limit: inline math typeset in custom math
+        fonts may linearize/garble.
 
         ## 2. Translate the Markdown
 
