@@ -4,16 +4,10 @@ import SwiftUI
 struct ChatView: View {
     @Environment(AppState.self) private var app
 
-    /// True while the viewport is parked at (or within `bottomEpsilon` of) the
-    /// bottom of the chat. Streaming tokens only scroll the view when this is
-    /// true — so once the user scrolls up, decoding tokens stop yanking them
-    /// back. Flips true again automatically when they scroll back to bottom.
+    /// While true, streaming tokens keep the viewport pinned to the bottom.
+    /// Scrolling up detaches it; scrolling back to the bottom re-attaches it.
+    /// Starts attached.
     @State private var followBottom = true
-
-    /// True only while a *user* gesture is driving the scroll (drag / momentum),
-    /// as opposed to streaming relayout or a programmatic scroll. We update
-    /// `followBottom` from geometry only when this is set.
-    @State private var userScrolling = false
 
     var body: some View {
         @Bindable var app = app
@@ -70,46 +64,47 @@ struct ChatView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
             }
             .defaultScrollAnchor(.bottom)
-            // Only the user's own gesture may detach / re-attach bottom-follow.
-            // Streaming relayout and programmatic scrolls report `.idle` /
-            // `.animating`; if those drove `followBottom`, the bottom anchor
-            // sliding down as tokens stream in would read "not at bottom" and
-            // detach us mid-generation.
-            .onScrollPhaseChange { _, phase in
-                userScrolling = phase == .tracking
-                             || phase == .interacting
-                             || phase == .decelerating
+            // Re-evaluate bottom-follow from geometry, but only on frames where
+            // the content did NOT grow. Streaming appends height while the
+            // offset lags a frame, which would read as "scrolled up" and
+            // falsely detach — so we skip those and let `streamingTick` re-pin.
+            // Pure scroll frames (height stable) update `followBottom` straight
+            // from the distance, so re-attach lands even after the gesture ends.
+            .onScrollGeometryChange(for: Metrics.self) { geo in
+                Metrics(offsetY: geo.contentOffset.y,
+                        contentHeight: geo.contentSize.height,
+                        containerHeight: geo.containerSize.height)
+            } action: { old, new in
+                guard new.contentHeight <= old.contentHeight + 0.5 else { return }
+                followBottom = new.distanceFromBottom < Self.bottomEpsilon
             }
-            // Within `bottomEpsilon` counts as parked — re-attaches the moment
-            // the user scrolls back down.
-            .onScrollGeometryChange(for: Bool.self) { geo in
-                let distance = geo.contentSize.height
-                             - geo.contentOffset.y
-                             - geo.containerSize.height
-                return distance < Self.bottomEpsilon
-            } action: { _, atBottom in
-                if userScrolling { followBottom = atBottom }
-            }
-            // Streaming tokens: track only if the user wants to be tracked.
-            // No animation — animated programmatic scrolls would feed the
-            // geometry callback intermediate offsets and risk detaching.
+            // Streaming tokens: keep the bottom pinned while attached. No
+            // animation — animated offsets would feed the geometry callback
+            // intermediate values.
             .onChange(of: streamingTick) {
                 guard followBottom else { return }
                 proxy.scrollTo(Self.bottomID, anchor: .bottom)
             }
-            // New user turn: explicit intent — re-attach and snap, even if
-            // the user had previously scrolled up.
+            // New user turn: explicit intent — re-attach and snap, even if the
+            // user had previously scrolled up.
             .onChange(of: lastUserID) {
                 followBottom = true
-                withAnimation(.easeOut(duration: 0.15)) {
-                    proxy.scrollTo(Self.bottomID, anchor: .bottom)
-                }
+                proxy.scrollTo(Self.bottomID, anchor: .bottom)
             }
             // Coding-agent aesthetic: monospaced everywhere in the chat.
             // Cascades to MessageBubble / MarkdownView so headings, lists,
             // and inline runs all inherit unless they set an explicit design.
             .fontDesign(.monospaced)
         }
+    }
+
+    /// Snapshot of the scroll geometry. `distanceFromBottom` is the gap between
+    /// the viewport bottom and the content bottom (≈0 when parked).
+    private struct Metrics: Equatable {
+        var offsetY: CGFloat
+        var contentHeight: CGFloat
+        var containerHeight: CGFloat
+        var distanceFromBottom: CGFloat { contentHeight - offsetY - containerHeight }
     }
 
     private static let bottomID = "chat-bottom"
