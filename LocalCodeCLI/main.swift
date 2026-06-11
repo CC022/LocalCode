@@ -131,6 +131,12 @@ func run() async {
     let env = ProcessInfo.processInfo.environment
     let engine = InferenceEngine()
 
+    // PDF-translate debug with a fake (identity) translator never touches the
+    // model, so skip engine setup entirely for that combination.
+    let pdfDebugPath = env["LOCALCODE_TRANSLATE_PDF_DEBUG_PATH"]
+    let pdfDebugFake = env["LOCALCODE_TRANSLATE_PDF_DEBUG_FAKE"] == "1"
+    let needsModel = !(pdfDebugPath != nil && pdfDebugFake)
+
     // Optional OpenAI-compatible API backend, configured purely from env so no
     // endpoint/key ever touches the repo. Set all three to use it:
     //   LOCALCODE_API_BASE=https://<host>/v1
@@ -147,7 +153,7 @@ func run() async {
             exit(1)
         }
         stderr("Ready · API · \(model) @ \(base)\n")
-    } else {
+    } else if needsModel {
         stderr("Loading model from disk…\n")
         await engine.load()
         guard case .ready = engine.state else {
@@ -157,6 +163,29 @@ func run() async {
         stderr("Ready · \(engine.modelName) · context \(engine.contextWindow)\n")
     }
     stderr("cwd: \(cwd.path)\n\n")
+
+    // Debug path: bypass the agent loop and invoke translate_pdf directly. Set:
+    //   LOCALCODE_TRANSLATE_PDF_DEBUG_PATH=...   (PDF under cwd)
+    //   LOCALCODE_TRANSLATE_PDF_DEBUG_LANG=...   (default "Chinese (Simplified)")
+    // optional:
+    //   LOCALCODE_TRANSLATE_PDF_DEBUG_PAGES=1-3  (page range)
+    //   LOCALCODE_TRANSLATE_PDF_DEBUG_FAKE=1     (identity translator, no model)
+    //   LOCALCODE_TRANSLATE_PDF_DEBUG_OUTPUT=... (output dir)
+    if let dbgPath = pdfDebugPath {
+        let dbgLang = env["LOCALCODE_TRANSLATE_PDF_DEBUG_LANG"] ?? "Chinese (Simplified)"
+        stderr("[translate-pdf-debug] path=\(dbgPath) lang=\(dbgLang) fake=\(pdfDebugFake)\n")
+        let started = Date()
+        let result = await DebugEntries.translatePDF(
+            cwd: cwd, engine: engine,
+            path: dbgPath, targetLanguage: dbgLang,
+            pages: env["LOCALCODE_TRANSLATE_PDF_DEBUG_PAGES"],
+            fake: pdfDebugFake,
+            outputDir: env["LOCALCODE_TRANSLATE_PDF_DEBUG_OUTPUT"]
+        )
+        stderr("[translate-pdf-debug] elapsed \(String(format: "%.1fs", Date().timeIntervalSince(started)))\n")
+        print(result)
+        exit(0)
+    }
 
     // Debug path: bypass the agent loop and invoke translate_md directly so
     // we can iterate on the tool without a full chat round-trip. Set:

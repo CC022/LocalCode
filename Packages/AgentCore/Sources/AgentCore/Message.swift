@@ -51,7 +51,7 @@ public struct AgentToolCall: Equatable, Sendable {
                 return "parse PDF \(p) (pages \(pages))"
             }
             return "parse PDF \(p)"
-        case "translate_md":
+        case "translate_md", "translate_pdf":
             let p = arguments["path"]?.string ?? ""
             let lang = arguments["target_language"]?.string ?? "?"
             return "translate \(p) → \(lang)"

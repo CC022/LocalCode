@@ -27,4 +27,28 @@ public enum DebugEntries {
         if let outputPath { args["output_path"] = .string(outputPath) }
         return await tool.run(args)
     }
+
+    /// Translate `path` (a PDF under `cwd`) to `targetLanguage` via the
+    /// layout-preserving HTML pipeline. `fake: true` swaps the model for an
+    /// identity translator so geometry/HTML can be iterated without inference.
+    @MainActor
+    public static func translatePDF(
+        cwd: URL,
+        engine: InferenceEngine,
+        path: String,
+        targetLanguage: String,
+        pages: String? = nil,
+        fake: Bool = false,
+        outputDir: String? = nil
+    ) async -> String {
+        var tool = TranslatePDFTool(cwd: cwd, engine: engine)
+        if fake { tool.translator = { text, _ in text } }
+        var args: [String: JSONValue] = [
+            "path": .string(path),
+            "target_language": .string(targetLanguage),
+        ]
+        if let pages { args["pages"] = .string(pages) }
+        if let outputDir { args["output_dir"] = .string(outputDir) }
+        return await tool.run(args)
+    }
 }

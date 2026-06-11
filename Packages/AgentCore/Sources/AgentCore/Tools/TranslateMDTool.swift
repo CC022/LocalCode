@@ -20,7 +20,7 @@ struct TranslateMDTool: Tool {
         ToolSpecBuilder.make(
             name: name,
             description:
-                "Translate a Markdown file into another language using chunked, paragraph-aware passes through the local/API model. Writes incrementally to <output_path>; safe for long documents (papers, books) that exceed the model's context window. Preserves Markdown structure: headers, lists, image placeholders (![](images/..)), code blocks, and LaTeX are passed through verbatim. Returns a summary including chunk count, elapsed seconds, output path, and any structural-validation warnings.",
+                "Translate a Markdown file into another language using chunked, paragraph-aware passes through the local/API model. Writes incrementally to <output_path>; safe for long documents (papers, books) that exceed the model's context window. Preserves Markdown structure: headers, lists, image placeholders (![](images/..)), code blocks, and LaTeX are passed through verbatim. Returns a summary including chunk count, elapsed seconds, output path, and any structural-validation warnings. To translate a PDF, prefer translate_pdf (one step, preserves the original page layout) instead of parse_pdf + translate_md.",
             properties: [
                 (name: "path", type: "string", description: "Path to the Markdown file (relative to working directory or absolute under it)."),
                 (name: "target_language", type: "string", description: "Natural-language name of the target, e.g. \"Chinese (Simplified)\", \"Japanese\", \"Spanish\". Passed to the model verbatim."),
